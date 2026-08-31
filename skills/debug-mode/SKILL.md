@@ -14,7 +14,6 @@ If neither condition applies, stop before analysis, collection, or instrumentati
 This workflow builds on the sibling [`trace-mode`](../trace-mode/SKILL.md) workflow.
 It extends location evidence through correction, verification, and cleanup.
 The sibling scripts require Node.js 24 or later.
-Codex and Pi can provide interactive checkpoints.
 
 Run this evidence loop:
 
@@ -26,8 +25,11 @@ Work autonomously through instrumentation.
 The first planned user interaction is the reproduction checkpoint.
 Reproduction and verification are gates.
 
-Checkpoint invariant: every manual reproduction or verification attempt requires a fresh interactive checkpoint.
-A previous checkpoint result authorizes only its current attempt.
+Checkpoint invariant: every manual reproduction or verification attempt requires a fresh checkpoint.
+Tool availability alone selects its path: when native Codex `request_user_input` is listed, you MUST call it;
+otherwise call the Pi chooser when listed; use the exact plain-text template only after neither interactive path can run.
+The native tool call is the checkpoint; commentary or a final answer cannot replace it.
+A native cancellation leaves the gate pending, and a previous result authorizes only its current attempt.
 
 ## 1. Analyze the Code Path
 
@@ -81,7 +83,7 @@ The trace-mode workflow must hand back active probes and the five server values.
 ## 4. Cross the Reproduction Gate
 
 Read [`references/checkpoints.md`](references/checkpoints.md) before presenting the pre-fix checkpoint.
-Execute the pre-fix protocol exactly.
+Execute the pre-fix protocol through the checkpoint path selected above.
 Then wait and route its result through the state table.
 Every retry returns through this gate with a new interactive call.
 
@@ -123,7 +125,7 @@ Add a focused regression test when the behavior is automatable.
 
 ## 7. Cross the Verification Gate
 
-Present the post-fix checkpoint from [`references/checkpoints.md`](references/checkpoints.md).
+Present the post-fix checkpoint from [`references/checkpoints.md`](references/checkpoints.md) through the selected path.
 Then wait and route its result through the state table.
 Every later verification attempt requires another interactive call.
 

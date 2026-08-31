@@ -21,7 +21,8 @@ Use the first available path in this order:
 
 ## Native Codex Path
 
-Use this path when `request_user_input` is listed and the session can accept an interactive answer.
+Use this path whenever `request_user_input` is listed.
+The tool listing selects this path; do not infer that the interactive UI is unavailable.
 Before the call, show these fields in this order:
 
 ```text
@@ -33,7 +34,9 @@ The manual debug checkpoint is ready:
 - Debug endpoint: <LOG_SERVER_URL>/log
 ```
 
-Call `request_user_input` once with the applicable payload. Then wait for its result.
+Call `request_user_input` once with the applicable payload.
+The call is the checkpoint response; wait for its result instead of substituting
+a plain-text prompt or final answer.
 
 ### Pre-Fix Native Payload
 
@@ -90,7 +93,7 @@ Map `Fixed (Recommended)` to `B`.
 Map `Still reproducible` to `A`.
 
 Codex supplies a free-form Other choice automatically. Map its submitted text to `C` evidence.
-If the native tool is absent or errors, continue to the Pi chooser path.
+If the native tool is absent or an attempted call returns an error, continue to the Pi chooser path.
 A native cancellation leaves the gate pending. Stop without selecting a result or falling back.
 
 ## Pi Chooser Path
@@ -113,7 +116,8 @@ A `cancelled` or `ui_unavailable` result switches to the applicable fallback tem
 
 ## Plain-Text Path
 
-Use plain text when both interactive paths are unavailable or the Pi chooser returns a fallback result.
+Use plain text only after the native path is unavailable (tool absent or call
+error) and the Pi path is unavailable or returns a fallback result.
 Send exactly the applicable template. Then wait for a typed reply.
 
 ### Pre-Fix Template

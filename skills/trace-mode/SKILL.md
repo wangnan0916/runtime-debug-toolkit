@@ -8,7 +8,6 @@ description: Trace runtime behavior and locate responsible code paths with tempo
 This workflow adds temporary logs, analyzes one runtime trace, and locates the responsible code boundary.
 It reports evidence without changing product behavior.
 The bundled scripts require Node.js 24 or later.
-Codex can use native `request_user_input`.
 
 Run this trace loop:
 
@@ -62,7 +61,11 @@ Keep runtime standard output unchanged.
 ## 5. Capture One Trace
 
 Run the trigger directly when it is safe and available.
-Otherwise read [`references/checkpoint.md`](references/checkpoint.md), present the checkpoint, and wait.
+Otherwise read [`references/checkpoint.md`](references/checkpoint.md) and select the checkpoint path from tool availability alone:
+when `request_user_input` is listed, you MUST call it; otherwise call the Pi chooser when listed;
+use the exact plain-text template only after neither interactive path can run.
+The native tool call is the checkpoint; commentary or a final answer cannot replace it.
+Present one fresh checkpoint for the attempt and wait. A native cancellation leaves it pending.
 
 **Complete when:** the current session contains a trace for the stated trigger.
 
