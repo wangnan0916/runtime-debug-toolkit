@@ -44,6 +44,7 @@ Each event must distinguish a path, transition, or relevant value.
 ## 3. Arm the Server
 
 Read [`references/collector.md`](references/collector.md) before running a server command.
+Select its startup permission path from the execution environment's declared sandbox limits.
 Use the safe wrapper unless the user supplied a complete healthy server contract.
 Capture every printed value.
 

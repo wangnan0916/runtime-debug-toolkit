@@ -137,7 +137,10 @@ HEALTH_URL=<loopback health URL>
 
 The safe wrapper binds to `127.0.0.1` on an available port. It can reuse one
 healthy server across concurrent sessions, while evidence remains separated in
-the operating system temporary directory.
+the operating system temporary directory. In a Codex sandbox that declares
+listener creation as approval-gated, the agent requests narrowly scoped
+approval for this wrapper as the normal startup path. Other environments start
+it directly.
 
 ## Package layout
 

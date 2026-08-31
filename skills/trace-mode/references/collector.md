@@ -53,21 +53,34 @@ The schema lives beside the writer in `scripts/collector-server.mjs`;
 `log-server.mjs` reads it back and re-validates the loopback URLs and pid
 before any reuse. Only the wrapper and its own child write or read this file.
 
-## Authorization Branch
+## Host Permission Path
 
-Try the safe wrapper in the default sandbox first.
-Request approval only after a clear permission, listener, or process error.
-Use this justification:
+Choose the permission path before starting the wrapper:
+
+- When the execution environment explicitly says spawned commands need approval
+  to create a network listener, run the safe wrapper once through that approval
+  mechanism. This is the normal startup path, not a failed-start recovery.
+- Otherwise run the safe wrapper normally. Retry through the host approval
+  mechanism only after a clear permission, listener, or process error.
+
+In Codex, submit the approval call directly with the exact wrapper command and
+put the reason in that call rather than a separate user message. Scope any
+reusable command rule to `node` plus the absolute `start-collector.mjs` path,
+and offer it only when that script and its imported sibling scripts are in a
+read-only installation directory. Omit a reusable rule for a writable skill
+or repository path. Never request a reusable rule for `node` alone.
+
+Use this approval reason:
 
 ```text
-Start or reuse the loopback log server.
+Allow this collector command to start or reuse its loopback-only log server?
 It binds only to 127.0.0.1.
 It writes state and log files in the operating-system temporary directory.
 It does not write to the repository.
 It does not make external network calls.
 ```
 
-An approval denial or service disconnect ends the attempt.
+An approval denial or service disconnect ends the automated attempt.
 Send this template with the real command:
 
 ```text

@@ -5,8 +5,10 @@ Read only the branch matching the observed failure.
 ## Startup
 
 Confirm Node.js 24 or later is active.
-Run `start-collector.mjs` in the default sandbox first.
-Follow the authorization branch in [`collector.md`](collector.md) after a clear permission or listener error.
+Follow the host permission path in [`collector.md`](collector.md).
+When the environment already declares that listeners require approval, use
+that path directly instead of reproducing `EPERM` in the default sandbox.
+In other environments, escalate only after a clear permission or listener error.
 
 ## Unhealthy Reuse State
 
