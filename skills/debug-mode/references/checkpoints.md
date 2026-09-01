@@ -6,12 +6,24 @@ A native checkpoint presents context, then one tool call.
 A Pi checkpoint contains only its chooser call.
 A plain-text checkpoint contains one exact fallback template.
 
-## Gate Invariant
+## Gate Result
 
 An active debug session survives user replies, tool results, retries, and context compaction.
-Every manual reproduction or verification attempt opens a fresh checkpoint.
-A checkpoint result authorizes only the current manual attempt.
-After routing a result, any later attempt starts again from path selection below.
+Every manual reproduction or verification attempt begins with `GATE_RESULT=PENDING`.
+
+Immediately before the first checkpoint call for an attempt, record the number of complete
+NDJSON lines currently in `LOG_FILE` as `ATTEMPT_START_LINE`; use `0` when the file does not
+exist. Only complete records after that line belong to this attempt. Existing records,
+tool activity labels, tests, and static code observations never change `GATE_RESULT`.
+
+Set `GATE_RESULT` to `A`, `B`, or `C` only from a valid answer returned by the selected
+checkpoint path for the current phase. A result authorizes only that attempt.
+While the result remains `PENDING`, finish the checkpoint path and yield: keep the session
+and probes active, and do not read evidence, edit product code, change `runId`, verify,
+clean up, or report a cause or fix.
+
+After routing a valid result, every later attempt starts again with a fresh line boundary
+and path selection below.
 
 Use the first available path in this order:
 
@@ -93,8 +105,12 @@ Map `Fixed (Recommended)` to `B`.
 Map `Still reproducible` to `A`.
 
 Codex supplies a free-form Other choice automatically. Map its submitted text to `C` evidence.
-If the native tool is absent or an attempted call returns an error, continue to the Pi chooser path.
-A native cancellation leaves the gate pending. Stop without selecting a result or falling back.
+The answer is valid only when the result contains the applicable question ID and a submitted
+value that maps above.
+
+If the native tool is absent, errors, or returns an empty or malformed result without an
+explicit cancellation, continue to the Pi chooser path. An explicit native cancellation
+leaves `GATE_RESULT=PENDING`; yield without selecting a result or falling back.
 
 ## Pi Chooser Path
 
@@ -112,13 +128,15 @@ C - Other: enter details
 ```
 
 Option `C` opens a free-form editor. Treat its submitted text as the checkpoint evidence.
-A `cancelled` or `ui_unavailable` result switches to the applicable fallback template.
+A `cancelled`, `ui_unavailable`, empty, or malformed result switches to the applicable
+fallback template without changing `GATE_RESULT`.
 
 ## Plain-Text Path
 
-Use plain text only after the native path is unavailable (tool absent or call
-error) and the Pi path is unavailable or returns a fallback result.
-Send exactly the applicable template. Then wait for a typed reply.
+Use plain text only after the native path fails under the rules above and the Pi path is
+unavailable or returns a fallback result.
+Send exactly the applicable template as the final action in the response. Then wait for a
+typed reply; `GATE_RESULT` remains `PENDING` until that reply maps to `A`, `B`, or `C`.
 
 ### Pre-Fix Template
 
@@ -160,9 +178,10 @@ The user can request another language. Preserve every field, field order, and op
 
 | Phase | Result | Route |
 | --- | --- | --- |
-| Pre-fix | `A` | Read current NDJSON evidence and classify every hypothesis. |
+| Either | `PENDING` | Yield with the session and probes active; no evidence analysis, product edit, phase change, cleanup, or completion claim. |
+| Pre-fix | `A` | Read NDJSON evidence after `ATTEMPT_START_LINE` and classify every hypothesis. |
 | Pre-fix | `B` | Record that probes changed reproduction. Request a narrower trigger or clarification. |
 | Pre-fix | `C` | Use the supplied details to adjust the trigger, hypotheses, or probes. |
-| Post-fix | `A` | Read post-fix evidence. Return to narrower hypotheses or probes. |
-| Post-fix | `B` | Accept the stated criterion and begin mechanical cleanup. |
+| Post-fix | `A` | Read post-fix evidence after `ATTEMPT_START_LINE`. Return to narrower hypotheses or probes. |
+| Post-fix | `B` | Confirm the expected current-attempt probes, then begin verified cleanup; missing probes require a fresh verification attempt. |
 | Post-fix | `C` | Use the supplied details to adjust verification, hypotheses, or probes. |

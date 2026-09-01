@@ -60,18 +60,23 @@ Keep runtime standard output unchanged.
 
 ## 5. Capture One Trace
 
-Run the trigger directly when it is safe and available.
-Otherwise read [`references/checkpoint.md`](references/checkpoint.md) and select the checkpoint path from tool availability alone:
-when `request_user_input` is listed, you MUST call it; otherwise call the Pi chooser when listed;
-use the exact plain-text template only after neither interactive path can run.
-The native tool call is the checkpoint; commentary or a final answer cannot replace it.
-Present one fresh checkpoint for the attempt and wait. A native cancellation leaves it pending.
+Immediately before the attempt, record the current complete-line boundary from
+[`references/checkpoint.md`](references/checkpoint.md).
 
-**Complete when:** the current session contains a trace for the stated trigger.
+Run the trigger directly when it is safe and available. Otherwise present one fresh manual
+checkpoint through the path selected in that reference.
+
+- `PENDING`: yield with the session and probes active.
+- `B` or `C`: route the result through the state table, adjust the attempt, and return here with a fresh boundary and checkpoint.
+- `A`: continue with only the current-attempt records.
+
+Existing records and tool activity labels never complete this step.
+
+**Complete when:** a direct trigger or valid `A` produces every planned probe after `ATTEMPT_START_LINE` for the stated trigger.
 
 ## 6. Analyze and Locate
 
-Read the current session records from `LOG_FILE`.
+Read only complete records appended to `LOG_FILE` after `ATTEMPT_START_LINE`.
 Confirm that every planned probe is present, then inspect the records in file order and compare the relevant values.
 Return to Step 2 when expected events are missing.
 
@@ -85,7 +90,7 @@ Confidence: <high, medium, or low with reason>
 Next step: <smallest useful follow-up>
 ```
 
-**Complete when:** current-session evidence answers the question and identifies the responsible code boundary.
+**Complete when:** current-attempt evidence answers the question and identifies the responsible code boundary.
 
 ## 7. Clean or Hand Off
 

@@ -8,28 +8,29 @@ description: Diagnose and fix reproducible runtime bugs with temporary structure
 Start a session only when the current user invokes `$debug-mode`, says `debug mode`, or requests instrumented debugging.
 Resume whenever an active debug session exists, including after user replies or context compaction.
 The session becomes active when Step 3 arms the server.
-It ends only after Step 8 cleanup or explicit abandonment.
+It ends only after verified cleanup or explicit abandonment.
 If neither condition applies, stop before analysis, collection, or instrumentation.
 
 This workflow builds on the sibling [`trace-mode`](../trace-mode/SKILL.md) workflow.
 It extends location evidence through correction, verification, and cleanup.
 The sibling scripts require Node.js 24 or later.
 
-Run this evidence loop:
+The initial stage is:
 
 ```text
-analyze code -> hypothesize -> trace with trace-mode -> prove -> fix -> verify -> clean
+analyze code -> hypothesize -> trace with trace-mode -> reproduction gate
 ```
 
-Work autonomously through instrumentation.
-The first planned user interaction is the reproduction checkpoint.
-Reproduction and verification are gates.
+Work autonomously until the probes and collector are ready, then yield at the reproduction gate.
+Reproduction and verification are closed gates:
 
-Checkpoint invariant: every manual reproduction or verification attempt requires a fresh checkpoint.
-Tool availability alone selects its path: when native Codex `request_user_input` is listed, you MUST call it;
-otherwise call the Pi chooser when listed; use the exact plain-text template only after neither interactive path can run.
-The native tool call is the checkpoint; commentary or a final answer cannot replace it.
-A native cancellation leaves the gate pending, and a previous result authorizes only its current attempt.
+- Every manual attempt starts `PENDING` and requires a fresh checkpoint.
+- Only a valid result from that checkpoint unlocks the next stage.
+- While `PENDING`, keep the session and probes active; the only progress is completing the checkpoint.
+- Logs, tests, static analysis, tool activity labels, and results from earlier attempts never unlock a gate.
+
+Read [`references/checkpoints.md`](references/checkpoints.md) at every gate for result validation,
+fallback routing, and the current-attempt log boundary.
 
 ## 1. Analyze the Code Path
 
@@ -82,65 +83,14 @@ The trace-mode workflow must hand back active probes and the five server values.
 
 ## 4. Cross the Reproduction Gate
 
-Read [`references/checkpoints.md`](references/checkpoints.md) before presenting the pre-fix checkpoint.
-Execute the pre-fix protocol through the checkpoint path selected above.
-Then wait and route its result through the state table.
-Every retry returns through this gate with a new interactive call.
+Prepare and present one pre-fix checkpoint through the selected path in
+[`references/checkpoints.md`](references/checkpoints.md).
 
-**Complete when:** a valid `A`, `B`, or `C` result has been routed by phase.
+- `PENDING`: yield with the session active.
+- Pre-fix `B` or `C`: route the result through the state table, adjust the attempt, and return here with a fresh checkpoint.
+- Pre-fix `A`: read [`references/prove-fix-verify.md`](references/prove-fix-verify.md) and continue there.
 
-## 5. Prove the Cause
-
-After pre-fix `A`, read the current session records in `LOG_FILE` before editing product code.
-Confirm that every expected probe is present, then inspect the records in file order and compare the relevant values with each hypothesis prediction.
-Classify each hypothesis as `CONFIRMED`, `REJECTED`, or `INCONCLUSIVE`.
-Write the evidence report:
-
-```text
-H1 <short cause>
-Status: CONFIRMED
-Evidence: <specific events and values>
-
-H2 <short cause>
-Status: REJECTED
-Evidence: <specific events and values>
-
-Acceptance: <one observable sentence>
-Next action: <smallest correction for the confirmed cause>
-```
-
-Missing expected probes block confirmation.
-Return to Step 2 when every result is rejected or inconclusive.
-
-**Complete when:** current-run records confirm one explanatory cause, with one observable acceptance criterion.
-
-## 6. Make the Evidence-Bound Fix
-
-Make the smallest change that addresses the confirmed cause.
-Keep every probe active.
-Change events to `runId: "post-fix"`.
-Add a focused regression test when the behavior is automatable.
-
-**Complete when:** each product edit traces to the cause, and post-fix evidence is ready.
-
-## 7. Cross the Verification Gate
-
-Present the post-fix checkpoint from [`references/checkpoints.md`](references/checkpoints.md) through the selected path.
-Then wait and route its result through the state table.
-Every later verification attempt requires another interactive call.
-
-**Complete when:** the user returns post-fix `B` for the stated acceptance criterion.
-
-## 8. Clean Mechanically
-
-Remove every paired region marked `LOG_SERVER_PROBE <session_id>`.
-Search for the session ID, `LOG_SERVER_PROBE`, and both region forms.
-Remove copied helpers and all temporary instrumentation.
-Delete `LOG_FILE` unless the user requests retained evidence.
-Keep the shared server running unless the user requests shutdown.
-Run relevant checks and inspect the final diff.
-
-**Complete when:** marker and session searches return zero repository matches, checks pass, and only product changes remain.
+**Complete when:** a valid pre-fix `A` unlocks the evidence stage, or the current `B`/`C` result has been routed without advancing it.
 
 ## Exception Branch
 
