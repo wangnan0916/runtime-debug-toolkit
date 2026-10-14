@@ -45,6 +45,8 @@ Each event must distinguish a path, transition, or relevant value.
 Read [`references/collector.md`](references/collector.md) before running a server command.
 Select its startup permission path from the execution environment's declared sandbox limits.
 Use the safe wrapper unless the user supplied a complete healthy server contract.
+For a phone or remote producer that cannot reach loopback, use the Cloudflare
+Quick Tunnel branch in that reference.
 Capture every printed value.
 
 **Complete when:** `LOG_SERVER_URL`, `SESSION_ID`, `LOG_DIR`, `LOG_FILE`, and `HEALTH_URL` are known.
@@ -98,6 +100,7 @@ For a standalone trace, remove every `LOG_SERVER_PROBE <session_id>` region.
 Search for the marker, session ID, and both region forms.
 Delete `LOG_FILE` unless the user requests retained evidence.
 Keep the shared server running unless the user requests shutdown.
+Stop any cloudflared process started for this session when the standalone trace ends.
 
 When another workflow called this skill, hand back the active probes and evidence.
 The caller then owns later edits, verification, and cleanup.

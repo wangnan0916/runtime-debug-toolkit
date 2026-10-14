@@ -1,7 +1,9 @@
 // #region LOG_SERVER_PROBE <session_id> node-log-helper
 const LOG_SERVER_SESSION = "<session_id>";
 const LOG_SERVER_ENDPOINT = "<LOG_SERVER_URL>/log";
-const LOG_SERVER_HTTP = process.getBuiltinModule("node:http");
+const LOG_SERVER_HTTP = process.getBuiltinModule(
+  new URL(LOG_SERVER_ENDPOINT).protocol === "https:" ? "node:https" : "node:http",
+);
 
 const logServerLog = (event) => {
   try {

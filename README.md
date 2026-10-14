@@ -142,6 +142,21 @@ listener creation as approval-gated, the agent requests narrowly scoped
 approval for this wrapper as the normal startup path. Other environments start
 it directly.
 
+## Phone debugging across networks
+
+Start the local collector normally. Check `cloudflared --version`; if missing,
+the agent prepares it using the [official installation instructions](https://developers.cloudflare.com/tunnel/downloads/).
+Then keep a Quick Tunnel running against the collector's printed origin:
+
+```bash
+cloudflared tunnel --url <local LOG_SERVER_URL>
+```
+
+Use the generated HTTPS origin as the producer's reporting address. The `/log`
+path, session, event format, and local evidence file are the same. See the
+[skill guidance](skills/trace-mode/references/collector.md#cross-network-devices)
+for health checks, cleanup, and the 200 concurrent-request limit.
+
 ## Package layout
 
 ```text

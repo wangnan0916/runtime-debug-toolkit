@@ -7,6 +7,7 @@ Search for the session ID, `LOG_SERVER_PROBE`, and both region forms.
 Remove copied helpers and all temporary instrumentation.
 Delete `LOG_FILE` unless the user requests retained evidence.
 Keep the shared server running unless the user requests shutdown.
+Stop any cloudflared process started for this session.
 Run relevant checks and inspect the final diff.
 
 **Complete when:** marker and session searches return zero repository matches, checks pass, and only product changes remain.

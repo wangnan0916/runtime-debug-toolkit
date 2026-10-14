@@ -30,6 +30,38 @@ The five `KEY=VALUE` lines remain the human-readable form of the same contract.
 A complete user-supplied set can replace the command.
 Confirm `HEALTH_URL` before reusing that set.
 
+## Cross-Network Devices
+
+When a phone or remote producer cannot reach loopback, start the collector normally
+and retain its printed local contract. Then:
+
+1. Check `cloudflared --version` on the development machine. If missing, the agent
+   follows the [official installation instructions](https://developers.cloudflare.com/tunnel/downloads/)
+   for that environment and checks the command again.
+2. Keep a foreground [Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
+   running against the collector's printed loopback origin:
+
+   ```bash
+   cloudflared tunnel --url <local LOG_SERVER_URL>
+   ```
+
+3. Read the generated `https://<random>.trycloudflare.com` origin. Use it as the
+   producer's `LOG_SERVER_URL` and set `HEALTH_URL` to that origin plus `/health`.
+   Keep `SESSION_ID`, `LOG_DIR`, `LOG_FILE`, the `/log` path, and event payloads the
+   same. Keep the original loopback contract for local reuse; do not edit service state.
+
+Check public `/health` and one allowlisted event in `LOG_FILE` before capture;
+record the attempt boundary after this transport check. Keep the tunnel active
+through pending capture/verification, pass its command handle on handoff, and
+stop only the cloudflared process started for this session when finished.
+Anyone with the temporary URL can reach the forwarded collector while it runs.
+
+Quick Tunnels need no Cloudflare login. The **200-request limit is concurrent
+unfinished requests per tunnel**, not a total log quota or requests-per-second
+limit; excess requests return **429**. Frequent logging and slow requests can hit
+it. Current helpers send one event per request without batching or retries, so
+check for delivery loss before interpreting missing probes as runtime evidence.
+
 ## Runtime Contract
 
 - `GET /health` reports server status.
