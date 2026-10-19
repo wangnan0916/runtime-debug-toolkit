@@ -57,8 +57,13 @@ Add the planned events using the generic helpers or an equivalent runtime client
 Wrap every helper and event in the required session markers.
 Inspect every payload field against the privacy allowlist.
 Keep runtime standard output unchanged.
+Read [`references/connection-status.md`](references/connection-status.md).
+When the instrumented runtime has a user-facing UI, add a temporary bottom-right
+log service connection indicator using the project's UI and request APIs. Keep
+it active through capture, pending checkpoints, and caller handoff. For runtimes
+without a UI, report connection status in the agent's checkpoint context.
 
-**Complete when:** every planned event is marked, session-correct, low-volume, and privacy-reviewed.
+**Complete when:** every planned event is marked, session-correct, low-volume, and privacy-reviewed, and connection status is visible to the user.
 
 ## 5. Capture One Trace
 
@@ -97,12 +102,14 @@ Next step: <smallest useful follow-up>
 ## 7. Clean or Hand Off
 
 For a standalone trace, remove every `LOG_SERVER_PROBE <session_id>` region.
+Remove the connection indicator and its timers, listeners, and pending requests.
 Search for the marker, session ID, and both region forms.
 Delete `LOG_FILE` unless the user requests retained evidence.
 Keep the shared server running unless the user requests shutdown.
 Stop any cloudflared process started for this session when the standalone trace ends.
 
-When another workflow called this skill, hand back the active probes and evidence.
+When another workflow called this skill, hand back the active probes, connection
+indicator, and evidence, including the last connection check result and time.
 The caller then owns later edits, verification, and cleanup.
 
 **Complete when:** standalone traces leave no instrumentation, or the caller receives an explicit active-trace handoff.

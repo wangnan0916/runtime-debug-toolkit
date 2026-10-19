@@ -63,3 +63,10 @@ Keep the helper name `logServerLog`.
 For another runtime, write the smallest local client beside the traced boundary.
 Follow [`protocol.md`](protocol.md).
 Delivery failures must leave product behavior unchanged.
+
+## Connection Status
+
+Follow [`connection-status.md`](connection-status.md) when adding the temporary
+connection indicator. Implement it with the target project's UI and request
+APIs; the bundled log helpers do not mount UI or track health. Keep its checks
+separate from business probes so they do not add records to the trace.

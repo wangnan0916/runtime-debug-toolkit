@@ -5,6 +5,8 @@ Read this file only after a valid post-fix `B` result for the current acceptance
 Remove every paired region marked `LOG_SERVER_PROBE <session_id>`.
 Search for the session ID, `LOG_SERVER_PROBE`, and both region forms.
 Remove copied helpers and all temporary instrumentation.
+Remove the connection indicator, styles, mounting hooks, health timers, and
+lifecycle listeners; cancel or ignore pending health responses.
 Delete `LOG_FILE` unless the user requests retained evidence.
 Keep the shared server running unless the user requests shutdown.
 Stop any cloudflared process started for this session.

@@ -77,9 +77,11 @@ Read [`references/probes.md`](references/probes.md) for the debug event extensio
 Return here before its standalone trace checkpoint.
 
 This workflow is the caller.
-The trace-mode workflow must hand back active probes and the five server values.
+The trace-mode workflow must hand back active probes, connection status, and the
+five server values. Keep its temporary UI indicator and health checks active
+through both gates and the fix; remove them during verified cleanup.
 
-**Complete when:** every hypothesis has an active probe and all five server values are known.
+**Complete when:** every hypothesis has an active probe, all five server values are known, and connection status is visible to the user.
 
 ## 4. Cross the Reproduction Gate
 

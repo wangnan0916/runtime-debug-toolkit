@@ -142,6 +142,15 @@ listener creation as approval-gated, the agent requests narrowly scoped
 approval for this wrapper as the normal startup path. Other environments start
 it directly.
 
+For projects with a UI, the agent also adds a temporary bottom-right log service
+connection indicator. The skill defines its
+[states and lifecycle](skills/trace-mode/references/connection-status.md); the
+agent implements it with the target project's UI and request APIs, whether H5,
+a mini program, or another runtime. It checks `/health` from the producer's
+environment and updates as connectivity changes. Connected means the service
+is reachable; log delivery still requires evidence in the session file.
+The indicator and its checks are removed with the temporary probes.
+
 ## Phone debugging across networks
 
 Start the local collector normally. Check `cloudflared --version`; if missing,
