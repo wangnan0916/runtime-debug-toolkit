@@ -30,6 +30,7 @@ Use a same-origin proxy or server-side producer when loopback delivery is prohib
 
 ## Empty Log
 
-Confirm the producer reached its delivery boundary.
-Confirm the endpoint and session match the active server contract.
+After a manual gate permits analysis, confirm the producer reached its delivery
+boundary and inspect current-attempt evidence. Confirm the endpoint, session,
+and run match the active contract and event plan.
 Remember that `LOG_FILE` appears only after the first accepted event.

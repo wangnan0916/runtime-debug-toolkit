@@ -7,7 +7,8 @@ Read only the branch matching the observed collection failure.
 Confirm that the manual trigger crossed the instrumented boundary.
 Confirm that event and collector session IDs match.
 Confirm that the endpoint ends with `/log`.
-Check `LOG_FILE` for every expected probe and inspect the records in file order.
+After the gate permits analysis, check current-attempt records for the active
+session and run, and the probes expected for the observed path.
 
 ## Collection or Delivery Failure
 
@@ -22,6 +23,8 @@ Keep enough events to preserve causal ordering.
 
 ## Bug Does Not Recur
 
-Request the exact trigger, environment, input data, or a screen recording.
 Use pre-fix `B` in the checkpoint state table.
+Check known trigger and environment differences and whether instrumentation
+could affect timing. Ask only for missing details that distinguish the remaining
+possibilities; a non-reproduction does not establish its cause.
 Resume evidence analysis after a successful reproduction.

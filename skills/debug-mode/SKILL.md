@@ -1,99 +1,77 @@
 ---
 name: debug-mode
-description: Diagnose and fix reproducible runtime bugs with temporary structured logs, root-cause evidence, verification, and cleanup. Use for explicit debug-mode or instrumented debugging requests. Continue active sessions across reproduction replies. Use trace-mode when the goal stops at code location.
+description: Diagnose and fix runtime bugs using temporary structured logs and verified evidence. Use when the user invokes debug-mode or requests instrumented debugging, and resume active sessions after reproduction or verification replies. Use trace-mode for code location without a fix.
 ---
 
 # Debug Mode
 
-Start a session only when the current user invokes `$debug-mode`, says `debug mode`, or requests instrumented debugging.
-Resume whenever an active debug session exists, including after user replies or context compaction.
-The session becomes active when Step 3 arms the server.
-It ends only after verified cleanup or explicit abandonment.
-If neither condition applies, stop before analysis, collection, or instrumentation.
+Prove a runtime cause, fix it, verify the original behavior, and clean up.
+Start for `$debug-mode`, `/debug-mode`, `debug mode`, or an instrumented debugging
+request; resume an active session after replies or compaction. An unrelated task
+or a checkpoint answer without an active session does not start instrumentation.
+The sibling [`trace-mode`](../trace-mode/SKILL.md) supplies the collector and
+instrumentation workflow and requires Node.js 24 or later.
 
-This workflow builds on the sibling [`trace-mode`](../trace-mode/SKILL.md) workflow.
-It extends location evidence through correction, verification, and cleanup.
-The sibling scripts require Node.js 24 or later.
+## Working Contract
 
-The initial stage is:
+Within host permissions, explicit user scope and workflow choices override skill
+defaults. Continue authorized work without step-by-step approval. Resolve routine
+unknowns from available evidence; ask only for missing input that changes the
+next decision. Keep one compact Bug Card and Hypothesis Matrix in session context,
+updating them instead of repeating the plan. Read references as their stage applies.
 
-```text
-analyze code -> hypothesize -> trace with trace-mode -> reproduction gate
-```
+Manual reproduction and verification are the default observations for this workflow.
+Wait for the user's current-attempt result before advancing either manual gate.
+Tests or arriving logs cannot supply that result. An explicitly user-selected
+automated method changes only the named phase; report which method actually ran.
 
-Work autonomously until the probes and collector are ready, then yield at the reproduction gate.
-Reproduction and verification are closed gates:
+## 1. Analyze and Hypothesize
 
-- Every manual attempt starts `PENDING` and requires a fresh checkpoint.
-- Only a valid result from that checkpoint unlocks the next stage.
-- While `PENDING`, keep the session and probes active; the only progress is completing the checkpoint.
-- Logs, tests, static analysis, tool activity labels, and results from earlier attempts never unlock a gate.
+Read the entry points, handlers, state transitions, logs, and changes relevant to
+the symptom. Keep a Bug Card: symptom versus expected behavior; trigger and
+input; candidate path and disputed boundaries; environment and available
+evidence; observable acceptance criterion. Mark unavailable facts `unknown`.
 
-Read [`references/checkpoints.md`](references/checkpoints.md) at every gate for result validation,
-fallback routing, and the current-attempt log boundary.
-
-## 1. Analyze the Code Path
-
-Start repository legwork from the reported symptom.
-Read relevant entry points, handlers, state transitions, existing logs, and recent changes.
-Map candidate paths from the user's trigger to the observed outcome.
-Write a Bug Card:
-
-- Symptom and expected behavior
-- Known trigger, route, command, input, or fixture
-- Candidate runtime path and disputed boundaries
-- Relevant environment, frequency, changes, and evidence
-- Observable acceptance criterion
-
-Record unavailable facts as `unknown`.
-Resolve consequential unknowns through code reading or discriminating runtime probes.
-
-**Complete when:** one candidate path links trigger to symptom, and each disputed branch has a named probe boundary.
-
-## 2. Build the Hypothesis Matrix
-
-Write two to five ranked hypotheses before adding probes.
-Anchor the matrix in code analysis and available evidence.
-Use this shape:
+Rank hypotheses supported by that evidence. Each needs:
 
 ```text
-H1 <short cause>
+H1 <cause>
 Prediction: <runtime state, path, or timing>
-Probe: <event names and code locations>
-CONFIRMED when: <specific record condition>
-REJECTED when: <specific record condition>
+Probe: <events and code locations>
+CONFIRMED when: <record condition>
+REJECTED when: <record condition>
 ```
 
-A hypothesis without a concrete prediction requires more code reading.
-Prefer probes that separate multiple hypotheses.
+Use enough hypotheses and probes to distinguish the cause, without a fixed quota.
+Prefer events that separate multiple explanations. Batch independent reads;
+keep session edits, checkpoints, and cleanup under one owner.
 
-**Complete when:** every hypothesis has falsifiable conditions and a distinguishing planned probe.
+## 2. Instrument Through Trace Mode
 
-## 3. Trace Through Trace Mode
+Read [`trace-mode`](../trace-mode/SKILL.md) and use its caller mode with the Bug
+Card and Hypothesis Matrix. Read [`references/probes.md`](references/probes.md)
+for the debug event extension. Return before standalone capture with active
+probes, the Collector Contract, producer connection status, and any tunnel handle.
+Keep probes and connection checks active through the fix and verification.
 
-Read the sibling [`trace-mode`](../trace-mode/SKILL.md) skill.
-Use its event planning, server startup, and instrumentation steps with the Bug Card.
-Read [`references/probes.md`](references/probes.md) for the debug event extension.
-Return here before its standalone trace checkpoint.
+## 3. Reproduce, Prove, Fix, and Verify
 
-This workflow is the caller.
-The trace-mode workflow must hand back active probes, connection status, and the
-five server values. Keep its temporary UI indicator and health checks active
-through both gates and the fix; remove them during verified cleanup.
+Use [`references/checkpoints.md`](references/checkpoints.md) for the attempt
+boundary, supported interaction path, result validation, and phase mappings.
 
-**Complete when:** every hypothesis has an active probe, all five server values are known, and connection status is visible to the user.
+- `PENDING`: keep the session active and wait.
+- Pre-fix `B` or `C`: follow the result table, adjust the attempt, and checkpoint again.
+- Pre-fix `A`: follow [`references/prove-fix-verify.md`](references/prove-fix-verify.md)
+  through evidence, correction, verification, and cleanup. No additional approval
+  is needed to fix the confirmed cause within the requested scope.
 
-## 4. Cross the Reproduction Gate
+## Completion and Exceptions
 
-Prepare and present one pre-fix checkpoint through the selected path in
-[`references/checkpoints.md`](references/checkpoints.md).
+Report the cause with current-attempt evidence and file locations, what changed,
+verification performed, cleanup status, and remaining uncertainty. Use the user's
+language and detail proportional to the diagnosis.
 
-- `PENDING`: yield with the session active.
-- Pre-fix `B` or `C`: route the result through the state table, adjust the attempt, and return here with a fresh checkpoint.
-- Pre-fix `A`: read [`references/prove-fix-verify.md`](references/prove-fix-verify.md) and continue there.
-
-**Complete when:** a valid pre-fix `A` unlocks the evidence stage, or the current `B`/`C` result has been routed without advancing it.
-
-## Exception Branch
-
-Read [`references/troubleshooting.md`](references/troubleshooting.md) only when collection, reproduction, or delivery fails.
+The session ends after cleanup or explicit abandonment. For abandonment, follow
+[`references/cleanup.md`](references/cleanup.md) without claiming a verified fix.
+Read [`references/troubleshooting.md`](references/troubleshooting.md) only when
+collection, reproduction, or delivery fails.

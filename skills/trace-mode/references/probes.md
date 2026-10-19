@@ -4,7 +4,9 @@ Read this reference before adding temporary instrumentation.
 
 ## Event Shape
 
-Use stable probe names around the traced boundary:
+Use stable probe names around the traced boundary. Record a `runId` in the event
+plan and include it in every event; standalone traces can use `trace-1`, while
+Debug Mode supplies its phase value. The helpers add the session, not the run ID.
 
 ```json
 {
@@ -42,6 +44,7 @@ Wrap every temporary helper and event with the session marker:
 ```ts
 // #region LOG_SERVER_PROBE <session_id> settings-before-persist
 logServerLog({
+  runId: "trace-1",
   probe: "settings.beforePersist",
   file: "src/settings/save.ts",
   fn: "saveSettings",

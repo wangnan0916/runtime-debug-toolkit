@@ -53,8 +53,9 @@ Connected means the service is reachable; it does not prove that a log was
 appended. `sendBeacon()` returning true only means the browser queued a request,
 and an opaque response cannot confirm delivery. A validated successful
 `POST /log` response confirms that request's append under [`protocol.md`](protocol.md).
-The agent must still find every expected probe in the current-attempt NDJSON
-records. Connection status never completes a trace or unlocks a manual gate.
+The agent must still find the probes expected for the observed path in the
+current-attempt NDJSON records. Connection status never completes a trace or
+unlocks a manual gate.
 
 ## Lifetime and Verification
 
@@ -65,9 +66,10 @@ pending checkpoints. Carry them with active probes when handing off to Debug
 Mode.
 
 Before the manual trigger, confirm the indicator is visible in the target UI
-and reflects a health response from that runtime. When practical, temporarily
-fail only the indicator's request path to verify unavailable and recovery,
-then restore the active endpoint; do not stop the shared collector. Follow
+and reflects a health response from that runtime. Exercise unavailable/recovery
+when changing the health lifecycle or investigating a connection failure: fail
+only the indicator's request path, then restore it. Leave the shared collector
+running. Reusing an unchanged, validated indicator needs no new failure drill. Follow
 [`troubleshooting.md`](troubleshooting.md) for unexpected connection failures.
 
 Dispose timers and lifecycle listeners and cancel or ignore pending responses

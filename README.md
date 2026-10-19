@@ -107,11 +107,21 @@ Debug Mode continues through a verified correction:
 analyze code -> hypothesize -> trace with trace-mode -> prove -> fix -> verify -> clean
 ```
 
-At manual checkpoints, Codex uses native phase-specific choices when available.
+At manual checkpoints, Codex uses native phase-specific choices when the tool
+and current execution mode support them. Asynchronous questions stay pending
+until the user submits a result; a tool acknowledgement or incoming logs cannot
+advance the gate.
 Pi uses the bundled A/B/C chooser for both workflows: `/debug-mode` gets the
 reproduction and verification chooser, `/trace-mode` the capture chooser.
-Other Agent Skills clients use a plain-text fallback. Active debug sessions continue across reproduction and verification
-replies until cleanup or explicit abandonment.
+Other Agent Skills clients use a plain-text fallback. Active sessions continue
+across capture, reproduction, and verification replies until cleanup, explicit
+handoff, or abandonment.
+
+Both skills continue authorized work without an approval at every step. Debug
+Mode retains manual reproduction and verification by default; an explicit user
+choice of an automated method changes only that phase. Evidence is scoped to the
+current session, run, and attempt, with probes required for the observed path.
+Cleanup removes only the current session's temporary additions.
 
 ## Local evidence loop
 
@@ -226,6 +236,11 @@ npm pack --dry-run
 Extension type imports resolve through `@earendil-works/pi-coding-agent`, which
 is listed in both `peerDependencies` (runtime, provided by Pi) and
 `devDependencies` (local editor/type checking only; never packed).
+
+Skill guidance follows the [OpenAI prompting recommendations](https://developers.openai.com/api/docs/guides/latest-model#prompting-best-practices):
+keep shared rules in one place, respect user scope, make stopping conditions
+explicit, and match verification effort to the change. Model and API settings
+remain the host's responsibility.
 
 ## Support
 

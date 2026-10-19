@@ -102,29 +102,16 @@ and offer it only when that script and its imported sibling scripts are in a
 read-only installation directory. Omit a reusable rule for a writable skill
 or repository path. Never request a reusable rule for `node` alone.
 
-Use this approval reason:
+For an actual approval request, explain the wrapper's loopback bind and temporary
+state/log writes; it neither modifies the repository nor calls external services.
+These statements describe the wrapper, not an optional public tunnel.
 
-```text
-Allow this collector command to start or reuse its loopback-only log server?
-It binds only to 127.0.0.1.
-It writes state and log files in the operating-system temporary directory.
-It does not write to the repository.
-It does not make external network calls.
-```
+If approval is denied, stop the blocked startup action and report the actual
+denial and its source; follow the host's approval rules instead of retrying the
+same action through another route. Continue independent code analysis if useful.
+When the host permits a user-managed collector and the user chooses that path,
+provide the wrapper command and obtain all five contract values before connecting
+the producer.
 
-An approval denial or service disconnect ends the automated attempt.
-Send this template with the real command:
-
-```text
-Command authorization blocks local log collection.
-
-Run this command in your terminal:
-
-node <trace-mode-skill-dir>/scripts/start-collector.mjs --session <session_id>
-
-Paste the printed LOG_SERVER_URL, SESSION_ID, LOG_DIR, LOG_FILE, and HEALTH_URL.
-
-I will wait before connecting the producer.
-```
-
-Wait for all five values before adding HTTP delivery.
+A service disconnect is not an approval denial. Check health and the reported
+failure before choosing the relevant troubleshooting or permission path.

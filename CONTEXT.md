@@ -26,7 +26,7 @@ architecture discussions; don't invent synonyms.
 
 ## Checkpoints
 
-- **Checkpoint Gate** — a mandatory human interaction (reproduction, verification, manual trigger) that blocks workflow progress until answered.
+- **Checkpoint Gate** — a required observation for a manual reproduction, verification, or trigger attempt. Dependent work waits for a submitted result; this is not approval for routine investigation. Explicit user changes to the verification method take precedence over the default manual workflow.
 - **Gate invariant** — every manual attempt requires a fresh checkpoint; a previous result authorizes only its own attempt.
-- **Checkpoint paths** — resolution order: native Codex `request_user_input`, then the Pi chooser tool (`debug_mode_checkpoint` / `trace_mode_checkpoint`), then a plain-text template fallback.
+- **Checkpoint paths** — resolution order: permitted native `request_user_input_async` (or synchronous `request_user_input` when its mode allows the question), then the Pi chooser tool (`debug_mode_checkpoint` / `trace_mode_checkpoint`), then plain text. Shared transport and validation live in `skills/trace-mode/references/manual-checkpoints.md`.
 - **Chooser spec** — code-defined choices per workflow (never model-supplied): phases, choice labels/meanings, which choice opens the free-form editor.

@@ -16,9 +16,9 @@ const TRACE_CHECKPOINT_SPEC: CheckpointSpec = {
 		"Show one Trace Mode checkpoint for a manual trigger attempt. An active trace session survives replies and retries until cleanup or explicit handoff.",
 	promptSnippet: "Show an interactive Trace Mode checkpoint with A, B, and C",
 	promptGuidelines: [
-		"A trace-mode session remains active until cleanup or explicit handoff, including across user replies and context compaction.",
-		"Call trace_mode_checkpoint for every manual trigger attempt, including retries after earlier checkpoint results.",
-		"Make it the only tool call in that assistant response. Use plain text only when this tool reports UI unavailable.",
+		"Use the bundled trace-mode checkpoint reference to choose the supported interaction path; native tools take precedence only when permitted in the current mode.",
+		"On the Pi path, call trace_mode_checkpoint for the current manual attempt after preparing its context, then wait for a submitted result before dependent work.",
+		"A cancelled or UI-unavailable result requests the plain-text fallback while the attempt stays pending. Preserve the active session across replies.",
 	],
 	phases: [{ id: "capture", action: "run the stated trigger" }],
 	choices: [

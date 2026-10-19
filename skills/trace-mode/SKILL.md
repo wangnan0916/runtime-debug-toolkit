@@ -1,119 +1,98 @@
 ---
 name: trace-mode
-description: Trace runtime behavior and locate responsible code paths with temporary structured logs and NDJSON evidence. Use for runtime handlers, state transitions, and async boundaries. Use debug-mode when the goal includes a product fix. Continue active traces across capture replies.
+description: Locate runtime handlers, state transitions, and async boundaries using temporary structured logs and NDJSON evidence when static reading cannot answer the runtime question. Resume active traces after capture replies. Use debug-mode when the goal includes a product fix.
 ---
 
 # Trace Mode
 
-This workflow adds temporary logs, analyzes one runtime trace, and locates the responsible code boundary.
-It reports evidence without changing product behavior.
-The bundled scripts require Node.js 24 or later.
+Locate a runtime code boundary with temporary logs and current-attempt evidence,
+then clean up. Product fixes belong to [`debug-mode`](../debug-mode/SKILL.md).
+The bundled collector scripts require Node.js 24 or later.
 
-Run this trace loop:
+## Working Contract
 
-```text
-analyze code -> plan events -> arm server -> instrument -> trigger -> analyze logs -> locate code -> clean
-```
+Within host permissions, explicit user scope and workflow choices override skill
+defaults. Continue authorized tracing through its answer and cleanup. Resolve
+routine unknowns with available tools; ask only for input that changes the next
+decision. Resume the same session after replies or compaction. Keep a compact
+Trace Card and event plan in context; read references as their stage applies.
+
+**Caller mode:** when Debug Mode supplies a Bug Card and hypotheses, reuse them
+and perform Steps 2–4 only. Return active probes, the Collector Contract, latest
+producer connection result and time, and any tunnel handle. The caller owns
+capture gates, analysis, fixes, and cleanup; skip standalone Steps 5–7.
 
 ## 1. Frame the Trace
 
-Start from the user's runtime question or observed behavior.
 Read relevant entry points, handlers, state transitions, and existing logs.
-Write a Trace Card:
+Keep a Trace Card: runtime question; trigger and input; candidate path; disputed
+boundary or state; observable answer. Mark unavailable facts `unknown`.
+Proceed when a candidate path reaches the boundary being investigated.
 
-- Runtime question
-- Trigger, route, command, input, or fixture
-- Candidate code path
-- Unknown boundary or state transition
-- Observable answer
+## 2. Plan Events
 
-Record unavailable facts as `unknown`.
-Resolve consequential unknowns through code reading or targeted events.
-
-**Complete when:** one candidate path reaches the unknown boundary, and the trace has one observable answer.
-
-## 2. Plan the Events
-
-Read [`references/probes.md`](references/probes.md) before editing instrumentation.
-Plan two to eight low-volume events around the disputed boundary.
-Each event must distinguish a path, transition, or relevant value.
-
-**Complete when:** every unknown has a named event and an expected record condition.
+Read [`references/probes.md`](references/probes.md). Choose the smallest set of
+low-volume events that distinguishes the relevant paths, transitions, or values.
+Record expected events for each path; mutually exclusive branches need not all
+emit. An absent event remains inconclusive until control-flow and delivery
+evidence distinguish a skipped branch from missing telemetry.
 
 ## 3. Arm the Server
 
-Read [`references/collector.md`](references/collector.md) before running a server command.
-Select its startup permission path from the execution environment's declared sandbox limits.
-Use the safe wrapper unless the user supplied a complete healthy server contract.
-For a phone or remote producer that cannot reach loopback, use the Cloudflare
-Quick Tunnel branch in that reference.
-Capture every printed value.
-
-**Complete when:** `LOG_SERVER_URL`, `SESSION_ID`, `LOG_DIR`, `LOG_FILE`, and `HEALTH_URL` are known.
+Follow [`references/collector.md`](references/collector.md) for startup and host
+permissions. Use its safe wrapper unless the user supplied a complete healthy
+contract; use its tunnel branch when the producer cannot reach loopback.
+Keep `LOG_SERVER_URL`, `SESSION_ID`, `LOG_DIR`, `LOG_FILE`, and `HEALTH_URL`, plus
+any effective remote destination separately from the local contract.
 
 ## 4. Instrument the Path
 
-Add the planned events using the generic helpers or an equivalent runtime client.
-Wrap every helper and event in the required session markers.
-Inspect every payload field against the privacy allowlist.
-Keep runtime standard output unchanged.
-Read [`references/connection-status.md`](references/connection-status.md).
-When the instrumented runtime has a user-facing UI, add a temporary bottom-right
-log service connection indicator using the project's UI and request APIs. Keep
-it active through capture, pending checkpoints, and caller handoff. For runtimes
-without a UI, report connection status in the agent's checkpoint context.
+Use the bundled helpers or an equivalent runtime client. Mark every helper and
+event for this session, allowlist payload fields, and preserve product stdout.
+Follow [`references/connection-status.md`](references/connection-status.md): add
+a temporary bottom-right connection indicator to a user-facing UI, or report
+producer connectivity in checkpoint context for a runtime without a UI.
 
-**Complete when:** every planned event is marked, session-correct, low-volume, and privacy-reviewed, and connection status is visible to the user.
+Check markers, session values, payloads, and producer connectivity before capture.
+Keep probes and connection checks active while waiting or handing off. In caller
+mode, return the ready instrumentation now.
 
-## 5. Capture One Trace
+## 5. Capture
 
-Immediately before the attempt, record the current complete-line boundary from
-[`references/checkpoint.md`](references/checkpoint.md).
+Use [`references/checkpoint.md`](references/checkpoint.md) for the attempt
+boundary and result routing. Run an authorized, available trigger directly and
+record its outcome; otherwise use its supported manual interaction path.
+Wait for the user's current-attempt result before advancing a manual gate.
 
-Run the trigger directly when it is safe and available. Otherwise present one fresh manual
-checkpoint through the path selected in that reference.
-
-- `PENDING`: yield with the session and probes active.
-- `B` or `C`: route the result through the state table, adjust the attempt, and return here with a fresh boundary and checkpoint.
-- `A`: continue with only the current-attempt records.
-
-Existing records and tool activity labels never complete this step.
-
-**Complete when:** a direct trigger or valid `A` produces every planned probe after `ATTEMPT_START_LINE` for the stated trigger.
+- `PENDING`: keep the session active and wait.
+- `B` or `C`: adjust the trigger or event plan, then start a fresh attempt.
+- Direct completion or `A`: analyze only current-attempt records.
 
 ## 6. Analyze and Locate
 
-Read only complete records appended to `LOG_FILE` after `ATTEMPT_START_LINE`.
-Confirm that every planned probe is present, then inspect the records in file order and compare the relevant values.
-Return to Step 2 when expected events are missing.
+Read complete records after `ATTEMPT_START_LINE`, filtered to the active session
+and run. Require events expected for the observed path, then compare values.
+Append order alone does not establish causality across concurrent producers;
+use correlation or sequence fields when needed. Missing required evidence
+returns to the event plan or the relevant delivery troubleshooting branch.
 
-Write the location report:
+Report the runtime question, file/function/boundary, specific probe names and
+log lines with relevant values, confidence and uncertainty, and smallest useful
+follow-up. Use the user's language and detail proportional to the question.
 
-```text
-Question: <runtime question>
-Location: <file, function, and boundary>
-Evidence: <ordered events and relevant values>
-Confidence: <high, medium, or low with reason>
-Next step: <smallest useful follow-up>
-```
+## 7. Clean Up
 
-**Complete when:** current-attempt evidence answers the question and identifies the responsible code boundary.
+Remove this session's paired `LOG_SERVER_PROBE <session_id>` regions, helpers,
+connection indicator, timers, listeners, and pending requests. Search for its
+session ID and paired markers to verify removal. Preserve other sessions and
+pre-existing changes. Delete `LOG_FILE` unless the user requests retained evidence;
+leave the shared server running unless shutdown was requested. Stop only a
+tunnel started for this session.
 
-## 7. Clean or Hand Off
+Inspect the diff and run relevant repository checks; repeat or expand them only
+for new edits, failures, or unresolved risks. Report cleanup status with the
+location evidence. On explicit abandonment, perform the same cleanup and state
+which questions remain unresolved.
 
-For a standalone trace, remove every `LOG_SERVER_PROBE <session_id>` region.
-Remove the connection indicator and its timers, listeners, and pending requests.
-Search for the marker, session ID, and both region forms.
-Delete `LOG_FILE` unless the user requests retained evidence.
-Keep the shared server running unless the user requests shutdown.
-Stop any cloudflared process started for this session when the standalone trace ends.
-
-When another workflow called this skill, hand back the active probes, connection
-indicator, and evidence, including the last connection check result and time.
-The caller then owns later edits, verification, and cleanup.
-
-**Complete when:** standalone traces leave no instrumentation, or the caller receives an explicit active-trace handoff.
-
-## Failure Branch
-
-Read [`references/troubleshooting.md`](references/troubleshooting.md) only after startup, capture, or delivery fails.
+Read [`references/troubleshooting.md`](references/troubleshooting.md) only after
+startup, capture, or delivery fails.

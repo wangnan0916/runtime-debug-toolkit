@@ -1,187 +1,61 @@
-# Manual Checkpoints
+# Debug Checkpoints
 
-Read this reference at each reproduction or verification gate.
-Checkpoint answers are protocol messages rather than progress summaries.
-A native checkpoint presents context, then one tool call.
-A Pi checkpoint contains only its chooser call.
-A plain-text checkpoint contains one exact fallback template.
+Use the shared [manual checkpoint transport](../../trace-mode/references/manual-checkpoints.md)
+for attempt boundaries, result validation, interaction paths, and session recovery.
+The mappings below belong to Debug Mode; do not use the standalone trace chooser.
 
-## Gate Result
+## Questions and Context
 
-An active debug session survives user replies, tool results, retries, and context compaction.
-Every manual reproduction or verification attempt begins with `GATE_RESULT=PENDING`.
+Prepare the phase, session, log file, effective `/log` endpoint, exact trigger,
+and the Bug Card's acceptance criterion. Explain what the user should observe.
 
-Immediately before the first checkpoint call for an attempt, record the number of complete
-NDJSON lines currently in `LOG_FILE` as `ATTEMPT_START_LINE`; use `0` when the file does not
-exist. Only complete records after that line belong to this attempt. Existing records,
-tool activity labels, tests, and static code observations never change `GATE_RESULT`.
-
-Set `GATE_RESULT` to `A`, `B`, or `C` only from a valid answer returned by the selected
-checkpoint path for the current phase. A result authorizes only that attempt.
-While the result remains `PENDING`, finish the checkpoint path and yield: keep the session
-and probes active, and do not read evidence, edit product code, change `runId`, verify,
-clean up, or report a cause or fix.
-
-After routing a valid result, every later attempt starts again with a fresh line boundary
-and path selection below.
-
-Use the first available path in this order:
-
-1. Native Codex path
-2. Pi chooser path
-3. Plain-text path
-
-## Native Codex Path
-
-Use this path whenever `request_user_input` is listed.
-The tool listing selects this path; do not infer that the interactive UI is unavailable.
-Before the call, show these fields in this order:
-
-```text
-The manual debug checkpoint is ready:
-
-- Phase: <pre-fix or post-fix>
-- Session: <session_id>
-- Log file: <LOG_FILE>
-- Debug endpoint: <LOG_SERVER_URL>/log
-```
-
-Call `request_user_input` once with the applicable payload.
-The call is the checkpoint response; wait for its result instead of substituting
-a plain-text prompt or final answer.
-
-### Pre-Fix Native Payload
-
-```json
-{
-  "questions": [
-    {
-      "header": "Reproduce",
-      "id": "reproduction_result",
-      "question": "Reproduce the original bug manually, then choose the result.",
-      "options": [
-        {
-          "label": "Reproduced (Recommended)",
-          "description": "The bug appeared again, so the current log can be analyzed."
-        },
-        {
-          "label": "Issue disappeared",
-          "description": "The bug did not appear, so the trigger or probes need adjustment."
-        }
-      ]
-    }
-  ]
-}
-```
-
-Map `Reproduced (Recommended)` to `A`.
-Map `Issue disappeared` to `B`.
-
-### Post-Fix Native Payload
-
-```json
-{
-  "questions": [
-    {
-      "header": "Verify fix",
-      "id": "verification_result",
-      "question": "Verify the original bug manually, then choose the result.",
-      "options": [
-        {
-          "label": "Fixed (Recommended)",
-          "description": "The acceptance criterion passed, so temporary instrumentation can be removed."
-        },
-        {
-          "label": "Still reproducible",
-          "description": "The bug remains, so post-fix evidence needs more analysis."
-        }
-      ]
-    }
-  ]
-}
-```
-
-Map `Fixed (Recommended)` to `B`.
-Map `Still reproducible` to `A`.
-
-Codex supplies a free-form Other choice automatically. Map its submitted text to `C` evidence.
-The answer is valid only when the result contains the applicable question ID and a submitted
-value that maps above.
-
-If the native tool is absent, errors, or returns an empty or malformed result without an
-explicit cancellation, continue to the Pi chooser path. An explicit native cancellation
-leaves `GATE_RESULT=PENDING`; yield without selecting a result or falling back.
-
-## Pi Chooser Path
-
-When `debug_mode_checkpoint` is available, call it as the response's only tool.
-Pass the real `phase`, `session`, `logFile`, and `debugEndpoint` values.
-Use `pre-fix` for reproduction and `post-fix` for verification.
-Repeat this tool call for every later attempt in either phase.
-
-The chooser presents exactly these options:
-
-```text
-A - Reproduced
-B - Fixed
-C - Other: enter details
-```
-
-Option `C` opens a free-form editor. Treat its submitted text as the checkpoint evidence.
-A `cancelled`, `ui_unavailable`, empty, or malformed result switches to the applicable
-fallback template without changing `GATE_RESULT`.
-
-## Plain-Text Path
-
-Use plain text only after the native path fails under the rules above and the Pi path is
-unavailable or returns a fallback result.
-Send exactly the applicable template as the final action in the response. Then wait for a
-typed reply; `GATE_RESULT` remains `PENDING` until that reply maps to `A`, `B`, or `C`.
-
-### Pre-Fix Template
-
-```text
-I added debug-mode probes.
-The collector writes to these locations:
-
-- Session: <session_id>
-- Log file: <LOG_FILE>
-- Debug endpoint: <LOG_SERVER_URL>/log
-
-Reproduce the bug manually. Then, select one option:
-
-A - Reproduced
-B - Fixed
-C - Other: describe what happened
-```
-
-### Post-Fix Template
-
-```text
-I kept the debug-mode probes active for post-fix verification.
-The collector writes to these locations:
-
-- Session: <session_id>
-- Log file: <LOG_FILE>
-- Debug endpoint: <LOG_SERVER_URL>/log
-
-Verify the original bug manually. Then, select one option:
-
-A - Reproduced
-B - Fixed
-C - Other: describe what happened
-```
-
-The user can request another language. Preserve every field, field order, and option when translating.
-
-## State Table
-
-| Phase | Result | Route |
+| Phase | Native header / question ID | Question |
 | --- | --- | --- |
-| Either | `PENDING` | Yield with the session and probes active; no evidence analysis, product edit, phase change, cleanup, or completion claim. |
-| Pre-fix | `A` | Read NDJSON evidence after `ATTEMPT_START_LINE` and classify every hypothesis. |
-| Pre-fix | `B` | Record that probes changed reproduction. Request a narrower trigger or clarification. |
+| `pre-fix` | `Reproduce` / `reproduction_result` | Reproduce the original bug manually, then choose the result. |
+| `post-fix` | `Verify fix` / `verification_result` | Verify the original bug against the stated acceptance criterion, then choose the result. |
+
+Native choices are phase-specific, in this order:
+
+| Phase | First choice | Second choice | Free-text input |
+| --- | --- | --- | --- |
+| `pre-fix` | Reproduced → `A` | Issue disappeared → `B` | Map by meaning, otherwise `C`. |
+| `post-fix` | Fixed → `B` | Still reproducible → `A` | Map by meaning, otherwise `C`. |
+
+For Pi, call `debug_mode_checkpoint` with the actual `phase`, `session`,
+`logFile`, and `debugEndpoint`. Pi and plain text use these fixed meanings:
+
+```text
+A - Reproduced
+B - Fixed
+C - Other: describe what happened
+```
+
+In pre-fix, `B` means the issue did not recur; it does not prove a fix or prove
+that instrumentation changed the behavior. Pi labels its editor choice
+`C - Other: enter details`.
+
+## Result Routing
+
+| Phase | Result | Next action |
+| --- | --- | --- |
+| Either | `PENDING` | Keep the attempt active and wait for its submitted result. |
+| Pre-fix | `A` | Read [`prove-fix-verify.md`](prove-fix-verify.md) and classify hypotheses using current-attempt evidence. |
+| Pre-fix | `B` | Investigate the trigger, environment, and possible probe effects; ask only for consequential missing details. |
 | Pre-fix | `C` | Use the supplied details to adjust the trigger, hypotheses, or probes. |
-| Post-fix | `A` | Read post-fix evidence after `ATTEMPT_START_LINE`. Return to narrower hypotheses or probes. |
-| Post-fix | `B` | Confirm the expected current-attempt probes, then begin verified cleanup; missing probes require a fresh verification attempt. |
+| Post-fix | `A` | Inspect current-attempt post-fix evidence and return to narrower hypotheses or probes. |
+| Post-fix | `B` | Confirm the expected current-attempt post-fix probes, then follow [`cleanup.md`](cleanup.md). Missing evidence requires a fresh verification attempt. |
 | Post-fix | `C` | Use the supplied details to adjust verification, hypotheses, or probes. |
+
+Every repeated trigger or verification starts a fresh attempt. A prior phase's
+answer, or records from before its boundary, cannot complete the new gate.
+
+## User-Selected Automated Method
+
+Manual gates are the default. If the user explicitly replaces reproduction or
+verification with an automated method, apply that choice only to the named phase.
+Record its trigger and observable criterion, take a fresh attempt boundary, and
+run the authorized trigger. Map its observed outcome to the same phase meanings:
+reproduced is `A`, criterion passed is `B`, and an unclear or failed execution is
+`C`. A successful command exit alone is insufficient. Retain the same session,
+run, and expected-probe requirements, and identify the result as automated in
+the report. Never infer this override from tests passing or the user being absent.
