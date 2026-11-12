@@ -1,28 +1,23 @@
 #!/usr/bin/env node
 
-import { spawn } from "node:child_process";
 import process from "node:process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { runCollector } from "./log-server.mjs";
 
-const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const LOG_SERVER_PATH = path.join(SCRIPT_DIR, "log-server.mjs");
 const FIXED_HOST = "127.0.0.1";
 const FIXED_PORT = "0";
-const FIXED_ARGS = ["--ensure", "--host", FIXED_HOST, "--port", FIXED_PORT];
-const PASSTHROUGH_OPTIONS = new Set(["--session", "--dir", "--state"]);
+const FIXED_ARGS = ["--host", FIXED_HOST, "--port", FIXED_PORT];
+const PASSTHROUGH_OPTIONS = new Set(["--session", "--dir"]);
 
 function usage() {
-  console.log(`Usage: node scripts/start-collector.mjs --session <id> [--dir <path>] [--state <path>]
+  console.log(`Usage: node scripts/start-collector.mjs --session <id> [--dir <path>]
 
-Starts or reuses the local log server with safe fixed network settings:
+Starts a dedicated foreground log server with safe fixed network settings:
   --host ${FIXED_HOST}
   --port ${FIXED_PORT}
 
 Options:
   --session   Session id and log filename stem
   --dir       Optional directory for NDJSON logs
-  --state     Optional service discovery state file
   --help      Show this help text
 `);
 }
@@ -49,10 +44,6 @@ function parseArgs(argv) {
       throw new Error(`${arg} is fixed to ${fixedValue}; do not pass it to start-collector.mjs.`);
     }
 
-    if (arg === "--ensure") {
-      throw new Error("--ensure is implied by start-collector.mjs; do not pass it explicitly.");
-    }
-
     if (PASSTHROUGH_OPTIONS.has(arg)) {
       const value = readValue(argv, i, arg);
       passthrough.push(arg, value);
@@ -68,23 +59,9 @@ function parseArgs(argv) {
   return passthrough;
 }
 
-function main() {
-  const passthrough = parseArgs(process.argv.slice(2));
-  const child = spawn(process.execPath, [LOG_SERVER_PATH, ...FIXED_ARGS, ...passthrough], {
-    stdio: "inherit",
-  });
-
-  child.on("exit", (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal);
-      return;
-    }
-    process.exit(code ?? 1);
-  });
-}
-
 try {
-  main();
+  const passthrough = parseArgs(process.argv.slice(2));
+  await runCollector([...FIXED_ARGS, ...passthrough]);
 } catch (error) {
   console.error(error.message || String(error));
   process.exit(1);

@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, realpath, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import net from "node:net";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -29,7 +28,7 @@ async function stopChild(child, tracker) {
   await tracker.promise.catch(() => {});
 }
 
-async function waitForLogServerUrl(child, exit) {
+async function waitForLogServerUrl(child, exit, contract = false) {
   let stderr = "";
   child.stderr.on("data", (chunk) => {
     stderr += chunk.toString("utf8");
@@ -44,10 +43,11 @@ async function waitForLogServerUrl(child, exit) {
 
     const onData = (chunk) => {
       output += chunk.toString("utf8");
-      const match = output.match(/^LOG_SERVER_URL=(http:\/\/[^\s]+)$/m);
+      const match = output.match(/^COLLECTOR_CONTRACT=(.+)\n/m);
       if (match) {
         cleanup();
-        resolve(match[1]);
+        const info = JSON.parse(match[1]);
+        resolve(contract ? info : info.logServerUrl);
       }
     };
 
@@ -155,41 +155,6 @@ async function postLog(logServerUrl, body) {
   });
 }
 
-function parseKeyOutput(output) {
-  const entries = output
-    .trim()
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.includes("="))
-    .map((line) => {
-      const index = line.indexOf("=");
-      return [line.slice(0, index), line.slice(index + 1)];
-    });
-  return Object.fromEntries(entries);
-}
-
-async function runNode(args, options) {
-  const child = spawn(process.execPath, args, {
-    ...options,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-
-  let stdout = "";
-  let stderr = "";
-  child.stdout.on("data", (chunk) => {
-    stdout += chunk.toString("utf8");
-  });
-  child.stderr.on("data", (chunk) => {
-    stderr += chunk.toString("utf8");
-  });
-
-  const [code, signal] = await once(child, "exit");
-  if (code !== 0) {
-    throw new Error(`Command failed: code=${code} signal=${signal} stdout=${stdout} stderr=${stderr}`);
-  }
-  return { stdout, stderr };
-}
-
 async function runNodeExpectFailure(args, options) {
   const child = spawn(process.execPath, args, {
     ...options,
@@ -226,32 +191,11 @@ async function closeServer(server) {
   });
 }
 
-async function stopPid(pid, healthUrl) {
-  if (pid) {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      return;
-    }
-  }
-
-  const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(healthUrl);
-      if (!response.ok) return;
-    } catch {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-}
-
 async function withRunningCollector(session, run) {
   const dir = await mkdtemp(path.join(tmpdir(), "local-log-server-"));
   const child = spawn(
     process.execPath,
-    [serverPath, "--dir", "logs", "--session", session, "--state", "collector.json", "--port", "0"],
+    [serverPath, "--dir", "logs", "--session", session, "--port", "0"],
     {
       cwd: dir,
       stdio: ["ignore", "pipe", "pipe"],
@@ -350,10 +294,6 @@ async function testHealthEndpoint() {
     assert.equal(typeof health.startedAt, "string");
     assert.equal(typeof health.uptimeMs, "number");
 
-    const state = JSON.parse(await readFile(path.join(dir, "collector.json"), "utf8"));
-    assert.equal(state.pid, child.pid);
-    assert.equal(state.logServerUrl, logServerUrl);
-
     await assertLogFileMissing(sessionLogPath(dir, session));
   });
 }
@@ -375,82 +315,14 @@ async function testRoutesBodySessionToLogFile() {
   });
 }
 
-async function testEnsureStartsAndReusesHealthyCollector() {
-  const dir = await mkdtemp(path.join(tmpdir(), "local-log-server-"));
-  let pid;
-  let healthUrl;
-
-  try {
-    const first = await runNode(
-      [serverPath, "--ensure", "--dir", "logs", "--session", "ensure-one", "--state", "collector.json"],
-      { cwd: dir },
-    );
-    const firstInfo = parseKeyOutput(first.stdout);
-    assert.equal(firstInfo.SESSION_ID, "ensure-one");
-    assert.equal(firstInfo.LOG_DIR, await expectedLogDir(dir));
-    assert.match(firstInfo.LOG_SERVER_URL, /^http:\/\/127\.0\.0\.1:\d+$/);
-    assert.equal(firstInfo.HEALTH_URL, `${firstInfo.LOG_SERVER_URL}/health`);
-
-    const firstHealth = await (await fetch(firstInfo.HEALTH_URL)).json();
-    assert.equal(firstHealth.ok, true);
-    pid = firstHealth.pid;
-    healthUrl = firstInfo.HEALTH_URL;
-
-    const write = await postLog(firstInfo.LOG_SERVER_URL, { session: "ensure-one", probe: "ensure.write" });
-    assert.equal(write.ok, true);
-
-    const second = await runNode(
-      [serverPath, "--ensure", "--dir", "logs", "--session", "ensure-two", "--state", "collector.json"],
-      { cwd: dir },
-    );
-    const secondInfo = parseKeyOutput(second.stdout);
-    assert.equal(secondInfo.SESSION_ID, "ensure-two");
-    assert.equal(secondInfo.LOG_SERVER_URL, firstInfo.LOG_SERVER_URL);
-
-    const secondHealth = await (await fetch(secondInfo.HEALTH_URL)).json();
-    assert.equal(secondHealth.pid, pid);
-
-    const events = await waitForNdjsonEvents(sessionLogPath(dir, "ensure-one"), 1);
-    assert.equal(events[0].probe, "ensure.write");
-  } finally {
-    await stopPid(pid, healthUrl);
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
-async function testStartCollectorWrapperUsesSafeDefaults() {
-  const dir = await mkdtemp(path.join(tmpdir(), "local-log-server-"));
-  let pid;
-  let healthUrl;
-
-  try {
-    const result = await runNode(
-      [startCollectorPath, "--dir", "logs", "--session", "safe-start", "--state", "collector.json"],
-      { cwd: dir },
-    );
-    const info = parseKeyOutput(result.stdout);
-    assert.equal(info.SESSION_ID, "safe-start");
-    assert.match(info.LOG_SERVER_URL, /^http:\/\/127\.0\.0\.1:\d+$/);
-    assert.equal(info.HEALTH_URL, `${info.LOG_SERVER_URL}/health`);
-
-    const health = await (await fetch(info.HEALTH_URL)).json();
-    pid = health.pid;
-    healthUrl = info.HEALTH_URL;
-    assert.equal(health.ok, true);
-    assert.equal(health.logServerUrl, info.LOG_SERVER_URL);
-  } finally {
-    await stopPid(pid, healthUrl);
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
 async function testStartCollectorWrapperRejectsUnsafeOrIncompleteArgs() {
   const dir = await mkdtemp(path.join(tmpdir(), "local-log-server-"));
   const cases = [
+    { args: ["--session", "safe-start", "--state", "collector.json"], message: /Unknown option: --state/ },
     { args: [], message: /Missing required --session/ },
     { args: ["--session", "safe-start", "--host", "0.0.0.0"], message: /--host is fixed/ },
     { args: ["--session", "safe-start", "--port", "3000"], message: /--port is fixed/ },
-    { args: ["--session", "safe-start", "--ensure"], message: /--ensure is implied/ },
+    { args: ["--session", "safe-start", "--ensure"], message: /Unknown option: --ensure/ },
   ];
 
   try {
@@ -494,192 +366,56 @@ async function testParallelSessionsWriteIndependently() {
   });
 }
 
-async function testEnsureIgnoresStaleStateFile() {
-  const dir = await mkdtemp(path.join(tmpdir(), "local-log-server-"));
-  let pid;
-  let healthUrl;
-
+async function testIndependentCollectorLifecycle() {
+  const children = [];
+  const infos = [];
   try {
-    await writeFile(
-      path.join(dir, "collector.json"),
-      JSON.stringify({
-        pid: 999999,
-        healthUrl: "http://127.0.0.1:9/health",
-        logServerUrl: "http://127.0.0.1:9",
-        logDir: path.join(dir, "logs"),
-      }),
-    );
-
-    const result = await runNode(
-      [serverPath, "--ensure", "--dir", "logs", "--session", "stale-state", "--state", "collector.json"],
-      { cwd: dir },
-    );
-    const info = parseKeyOutput(result.stdout);
-    const health = await (await fetch(info.HEALTH_URL)).json();
-    assert.equal(health.ok, true);
-    assert.notEqual(health.pid, 999999);
-    pid = health.pid;
-    healthUrl = info.HEALTH_URL;
+    // Even identical session IDs must not share a process, port, or default logs.
+    for (let i = 0; i < 2; i += 1) {
+      const child = spawn(process.execPath, [startCollectorPath, "--session", "same-session"], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      const exit = trackExit(child);
+      children.push({ child, exit });
+      infos.push(await waitForLogServerUrl(child, exit, true));
+    }
+    const [first, second] = infos;
+    assert.notEqual(first.logServerUrl, second.logServerUrl);
+    assert.notEqual(first.logDir, second.logDir);
+    for (const [index, info] of infos.entries()) {
+      assert.match(info.logServerUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+      assert.equal(info.sessionId, "same-session");
+      assert.equal(info.healthUrl, `${info.logServerUrl}/health`);
+      assert.equal(info.logFile, path.join(info.logDir, "same-session.ndjson"));
+      const health = await (await fetch(info.healthUrl)).json();
+      assert.equal(health.pid, children[index].child.pid);
+      assert.equal(health.logDir, info.logDir);
+      assert.equal(children[index].exit.hasExited(), false);
+      assert.equal((await postLog(info.logServerUrl, { probe: `collector-${index}` })).ok, true);
+    }
+    await stopChild(children[0].child, children[0].exit);
+    assert.equal((await children[0].exit.promise).code, 143);
+    await assert.rejects(() => fetch(first.healthUrl));
+    assert.equal((await fetch(second.healthUrl)).ok, true);
+    assert.equal((await readNdjsonEvents(first.logFile))[0].probe, "collector-0");
+    assert.equal((await readNdjsonEvents(second.logFile))[0].probe, "collector-1");
+    await stopChild(children[1].child, children[1].exit);
+    await assert.rejects(() => fetch(second.healthUrl));
   } finally {
-    await stopPid(pid, healthUrl);
-    await rm(dir, { recursive: true, force: true });
+    for (const { child, exit } of children) await stopChild(child, exit);
+    for (const info of infos) await rm(info.logDir, { recursive: true, force: true });
   }
 }
 
-async function testEnsureRejectsNonLoopbackStateUrls() {
+async function testReportsPortConflict() {
   const dir = await mkdtemp(path.join(tmpdir(), "local-log-server-"));
-  const fakeCollector = http.createServer((req, res) => {
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(
-      JSON.stringify({
-        ok: true,
-        pid: process.pid,
-        logServerUrl: "http://0.0.0.0:12345",
-        healthUrl: "http://0.0.0.0:12345/health",
-        logDir: path.join(dir, "fake-logs"),
-      }),
-    );
-  });
-  let pid;
-  let healthUrl;
-
-  try {
-    const port = await listenOnLoopback(fakeCollector);
-    await writeFile(
-      path.join(dir, "collector.json"),
-      JSON.stringify({
-        pid: process.pid,
-        healthUrl: `http://127.0.0.1:${port}/health`,
-        logServerUrl: `http://127.0.0.1:${port}`,
-        logDir: path.join(dir, "fake-logs"),
-      }),
-    );
-
-    const result = await runNode(
-      [serverPath, "--ensure", "--dir", "logs", "--session", "non-loopback-state", "--state", "collector.json"],
-      { cwd: dir },
-    );
-    const info = parseKeyOutput(result.stdout);
-
-    assert.match(info.LOG_SERVER_URL, /^http:\/\/127\.0\.0\.1:\d+$/);
-    assert.match(info.HEALTH_URL, /^http:\/\/127\.0\.0\.1:\d+\/health$/);
-
-    const health = await (await fetch(info.HEALTH_URL)).json();
-    pid = health.pid;
-    healthUrl = info.HEALTH_URL;
-    assert.equal(health.ok, true);
-    assert.notEqual(health.pid, process.pid);
-  } finally {
-    await closeServer(fakeCollector);
-    await stopPid(pid, healthUrl);
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
-async function testEnsureClearsStaleStartupLock() {
-  const dir = await mkdtemp(path.join(tmpdir(), "local-log-server-"));
-  let pid;
-  let healthUrl;
-
-  try {
-    const lockDir = path.join(dir, "collector.json.lock");
-    await mkdir(lockDir);
-    const staleTime = new Date(Date.now() - 10_000);
-    await utimes(lockDir, staleTime, staleTime);
-
-    const result = await runNode(
-      [serverPath, "--ensure", "--dir", "logs", "--session", "stale-lock", "--state", "collector.json"],
-      { cwd: dir },
-    );
-    const info = parseKeyOutput(result.stdout);
-    assert.equal(info.SESSION_ID, "stale-lock");
-
-    const health = await (await fetch(info.HEALTH_URL)).json();
-    pid = health.pid;
-    healthUrl = info.HEALTH_URL;
-    assert.equal(health.ok, true);
-  } finally {
-    await stopPid(pid, healthUrl);
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
-async function testEnsureReportsCollectorStartupFailure() {
-  const dir = await mkdtemp(path.join(tmpdir(), "local-log-server-"));
-  const blocker = net.createServer();
-
+  const blocker = http.createServer();
   try {
     const port = await listenOnLoopback(blocker);
-    const result = await runNodeExpectFailure(
-      [
-        serverPath,
-        "--ensure",
-        "--dir",
-        "logs",
-        "--session",
-        "startup-failure",
-        "--state",
-        "collector.json",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        String(port),
-      ],
-      { cwd: dir },
-    );
-
-    assert.match(result.stderr, /Failed to start the log server/);
-    assert.match(result.stderr, /Child stderr/);
+    const result = await runNodeExpectFailure([serverPath, "--dir", dir, "--port", String(port)]);
     assert.match(result.stderr, /EADDRINUSE/);
   } finally {
     await closeServer(blocker);
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
-async function testConcurrentEnsureUsesSingleCollector() {
-  const dir = await mkdtemp(path.join(tmpdir(), "local-log-server-"));
-
-  try {
-    const results = await Promise.all(
-      Array.from({ length: 4 }, (_, index) =>
-        runNode(
-          [
-            serverPath,
-            "--ensure",
-            "--dir",
-            "logs",
-            "--session",
-            `concurrent-${index + 1}`,
-            "--state",
-            "collector.json",
-          ],
-          { cwd: dir },
-        ),
-      ),
-    );
-    const infos = results.map((result) => parseKeyOutput(result.stdout));
-    const logServerUrls = new Set(infos.map((info) => info.LOG_SERVER_URL));
-    const healthUrls = new Set(infos.map((info) => info.HEALTH_URL));
-
-    assert.equal(logServerUrls.size, 1);
-    assert.equal(healthUrls.size, 1);
-    assert.deepEqual(
-      infos.map((info) => info.SESSION_ID).sort(),
-      ["concurrent-1", "concurrent-2", "concurrent-3", "concurrent-4"],
-    );
-
-    const healthUrl = [...healthUrls][0];
-    const health = await (await fetch(healthUrl)).json();
-    assert.equal(health.ok, true);
-    await stopPid(health.pid, healthUrl);
-  } finally {
-    try {
-      const state = JSON.parse(await readFile(path.join(dir, "collector.json"), "utf8"));
-      await stopPid(state.pid, state.healthUrl);
-    } catch {
-      // Collector may already be stopped or may never have started.
-    }
     await rm(dir, { recursive: true, force: true });
   }
 }
@@ -692,12 +428,7 @@ await testReportsWriteFailureBeforeReturningSuccess();
 await testHealthEndpoint();
 await testRoutesBodySessionToLogFile();
 await testParallelSessionsWriteIndependently();
-await testEnsureStartsAndReusesHealthyCollector();
-await testStartCollectorWrapperUsesSafeDefaults();
 await testStartCollectorWrapperRejectsUnsafeOrIncompleteArgs();
-await testEnsureIgnoresStaleStateFile();
-await testEnsureRejectsNonLoopbackStateUrls();
-await testEnsureClearsStaleStartupLock();
-await testEnsureReportsCollectorStartupFailure();
-await testConcurrentEnsureUsesSingleCollector();
+await testIndependentCollectorLifecycle();
+await testReportsPortConflict();
 console.log("log-server tests passed");

@@ -10,11 +10,12 @@ When the environment already declares that listeners require approval, use
 that path directly instead of reproducing `EPERM` in the default sandbox.
 In other environments, escalate only after a clear permission or listener error.
 
-## Unhealthy Reuse State
+## Collector Exited or Unhealthy
 
-Run the safe wrapper again with the intended session.
-It ignores stale state and rejects non-loopback service URLs.
-Inspect the printed `HEALTH_URL` before connecting a producer.
+Inspect the saved command handle and its stderr. Stop an unhealthy owned process
+before starting a replacement. Run the safe wrapper with the intended session;
+it starts a new process with a new contract. Update producer URLs and any tunnel,
+then confirm `HEALTH_URL` and event delivery before recording a fresh attempt.
 
 ## Rejected Event
 

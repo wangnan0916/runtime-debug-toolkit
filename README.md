@@ -125,11 +125,12 @@ Cleanup removes only the current session's temporary additions.
 
 ## Local evidence loop
 
-Both workflows share one loopback log server. It accepts a JSON object at
-`POST /log`, appends one NDJSON record, and exposes state at `GET /health`.
+Both workflows use a loopback log server owned by the current debugging session.
+It accepts a JSON object at `POST /log`, appends one NDJSON record, and exposes
+status at `GET /health`.
 Each debugging session uses a separate file and queue.
 
-Agents start or reuse the collector with:
+Agents start a dedicated collector as a long-running command with:
 
 ```bash
 node <trace-mode-skill-dir>/scripts/start-collector.mjs --session <id>
@@ -145,9 +146,11 @@ LOG_FILE=<session NDJSON path>
 HEALTH_URL=<loopback health URL>
 ```
 
-The safe wrapper binds to `127.0.0.1` on an available port. It can reuse one
-healthy server across concurrent sessions, while evidence remains separated in
-the operating system temporary directory. In a Codex sandbox that declares
+The safe wrapper binds to `127.0.0.1` on an available port. Each invocation runs
+its own foreground collector with a unique temporary log directory. The agent
+keeps its command handle through capture and verification, then stops the process
+when debugging completes or is abandoned. There is no global service reuse or
+discovery state file. In a Codex sandbox that declares
 listener creation as approval-gated, the agent requests narrowly scoped
 approval for this wrapper as the normal startup path. Other environments start
 it directly.
@@ -197,7 +200,7 @@ skills/trace-mode/
   assets/                          # browser and Node.js log helpers
   references/                      # event, collector, and checkpoint contracts
   scripts/                         # collector startup, sink, and lifecycle
-    log-server.mjs                 # CLI + ensure orchestrator
+    log-server.mjs                 # foreground CLI
     collector-server.mjs           # NDJSON HTTP sink (library)
     start-collector.mjs            # safe wrapper
 

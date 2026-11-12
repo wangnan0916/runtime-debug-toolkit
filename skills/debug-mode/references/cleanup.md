@@ -10,9 +10,10 @@ pre-existing changes, and product fixes; cancellation is not a request to revert
 product code.
 Remove the connection indicator, styles, mounting hooks, health timers, and
 lifecycle listeners; cancel or ignore pending health responses.
-Delete `LOG_FILE` unless the user requests retained evidence.
-Keep the shared server running unless the user requests shutdown.
-Stop any cloudflared process started for this session.
+Stop the collector and any cloudflared process started for this session through
+their saved command handles; confirm they exited. Leave a user-supplied collector
+running unless asked to stop it. Then delete `LOG_FILE` and its empty auto-created
+directory unless the user requests retained evidence.
 Inspect the diff and run checks affected by removing instrumentation, plus any
 outstanding repository-required checks. Reuse prior results for unchanged code;
 repeat or expand checks only when an edit, failure, or unresolved risk warrants it.

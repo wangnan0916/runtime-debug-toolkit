@@ -20,9 +20,8 @@ architecture discussions; don't invent synonyms.
 ## Collector runtime
 
 - **Sink** — the NDJSON HTTP server (`scripts/collector-server.mjs`): accepts `POST /log`, appends one record, exposes `/health`.
-- **Ensure orchestration** — CLI-side logic (`scripts/log-server.mjs`): reuse a healthy server or lock, start a detached child, wait for health.
-- **State File Contract** — the discovery record the detached server writes to the `--state` path; schema documented beside its writer in `collector-server.mjs`. Only the wrapper and its own child read or write it.
-- **Safe wrapper** — `scripts/start-collector.mjs`: fixes host to `127.0.0.1`, port to `0`, implies `--ensure`.
+- **Collector lifecycle** — one foreground process per debugging session, owned through the agent's command handle. Keep it alive through capture and verification; stop it on completion or abandonment. No global discovery or reuse.
+- **Safe wrapper** — `scripts/start-collector.mjs`: fixes host to `127.0.0.1` and port to `0`, starts the collector in the same process with a unique temporary log directory.
 
 ## Checkpoints
 

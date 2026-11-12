@@ -1,17 +1,20 @@
 # Server Lifecycle
 
-Read this reference before starting or reusing the server.
+Read this reference before starting the session’s server.
 
 ## Safe Start
 
-Run the wrapper with one session ID:
+Run the wrapper as a long-running command with one session ID:
 
 ```bash
 node <trace-mode-skill-dir>/scripts/start-collector.mjs --session <session_id>
 ```
 
 The wrapper fixes the host to `127.0.0.1` and the port to `0`.
-It also supplies `--ensure` to `log-server.mjs`.
+Each invocation starts its own foreground collector and unique temporary log
+directory; it does not discover or reuse a global service. Keep the host's
+command/session handle so the agent can stop this process later. Do not run it
+as a detached fire-and-forget process or wait for it to exit before continuing.
 Capture the printed Collector Contract — the five values plus their
 machine-readable form on the final `COLLECTOR_CONTRACT=` line:
 
@@ -48,7 +51,7 @@ and retain its printed local contract. Then:
 3. Read the generated `https://<random>.trycloudflare.com` origin. Use it as the
    producer's `LOG_SERVER_URL` and set `HEALTH_URL` to that origin plus `/health`.
    Keep `SESSION_ID`, `LOG_DIR`, `LOG_FILE`, the `/log` path, and event payloads the
-   same. Keep the original loopback contract for local reuse; do not edit service state.
+   same. Keep the original loopback contract and collector command handle.
 
 Check public `/health` and one allowlisted event in `LOG_FILE` before capture;
 record the attempt boundary after this transport check. Keep the tunnel active
@@ -71,19 +74,25 @@ check for delivery loss before interpreting missing probes as runtime evidence.
 - Each session has a separate file and write queue.
 - The default log directory is in the operating-system temporary directory.
 - `LOG_FILE` appears after the first accepted event.
-- One shared server can serve concurrent sessions.
+- Concurrent debugging sessions start independent collectors.
 
-The wrapper reuses healthy loopback state or starts a detached loopback child.
-It writes state, startup, and log files outside the repository.
-It makes no external network calls.
+The collector writes logs outside the repository and makes no external network
+calls. There is no discovery state file, startup lock, or detached child.
 
-## State File Contract
+## Ownership and Shutdown
 
-The detached server publishes its discovery record at the `--state` path
-(default `<tmp>/local-log-server-skill/collector.json`).
-The schema lives beside the writer in `scripts/collector-server.mjs`;
-`log-server.mjs` reads it back and re-validates the loopback URLs and pid
-before any reuse. Only the wrapper and its own child write or read this file.
+Keep the collector command handle alongside the Collector Contract. Retain both
+across replies, compaction, and handoffs; in caller mode, pass them to Debug Mode.
+Keep the collector running through pending capture, retries, and verification.
+When the session completes or is explicitly abandoned, stop the process through
+its command handle (SIGTERM or Ctrl-C) and confirm it exited. Stop any tunnel
+started for the session as well. Stop producers and pending requests first, then
+the collector, then remove session logs unless retained evidence was requested.
+Remove an empty auto-created log directory after deleting the logs.
+
+If the user supplied the collector, leave its lifecycle to them unless they
+request shutdown. If an owned collector dies, start a new one and update the
+producer and any tunnel with its new contract before recording another attempt.
 
 ## Host Permission Path
 
@@ -103,7 +112,7 @@ read-only installation directory. Omit a reusable rule for a writable skill
 or repository path. Never request a reusable rule for `node` alone.
 
 For an actual approval request, explain the wrapper's loopback bind and temporary
-state/log writes; it neither modifies the repository nor calls external services.
+log writes; it neither modifies the repository nor calls external services.
 These statements describe the wrapper, not an optional public tunnel.
 
 If approval is denied, stop the blocked startup action and report the actual

@@ -19,8 +19,9 @@ Trace Card and event plan in context; read references as their stage applies.
 
 **Caller mode:** when Debug Mode supplies a Bug Card and hypotheses, reuse them
 and perform Steps 2–4 only. Return active probes, the Collector Contract, latest
-producer connection result and time, and any tunnel handle. The caller owns
-capture gates, analysis, fixes, and cleanup; skip standalone Steps 5–7.
+producer connection result and time, collector command handle, and any tunnel
+handle. The caller owns capture gates, analysis, fixes, and cleanup; skip
+standalone Steps 5–7.
 
 ## 1. Frame the Trace
 
@@ -42,8 +43,9 @@ evidence distinguish a skipped branch from missing telemetry.
 Follow [`references/collector.md`](references/collector.md) for startup and host
 permissions. Use its safe wrapper unless the user supplied a complete healthy
 contract; use its tunnel branch when the producer cannot reach loopback.
-Keep `LOG_SERVER_URL`, `SESSION_ID`, `LOG_DIR`, `LOG_FILE`, and `HEALTH_URL`, plus
-any effective remote destination separately from the local contract.
+Keep the collector command handle and `LOG_SERVER_URL`, `SESSION_ID`, `LOG_DIR`,
+`LOG_FILE`, and `HEALTH_URL`, plus any effective remote destination separately
+from the local contract.
 
 ## 4. Instrument the Path
 
@@ -85,9 +87,10 @@ follow-up. Use the user's language and detail proportional to the question.
 Remove this session's paired `LOG_SERVER_PROBE <session_id>` regions, helpers,
 connection indicator, timers, listeners, and pending requests. Search for its
 session ID and paired markers to verify removal. Preserve other sessions and
-pre-existing changes. Delete `LOG_FILE` unless the user requests retained evidence;
-leave the shared server running unless shutdown was requested. Stop only a
-tunnel started for this session.
+pre-existing changes. Follow the collector reference's shutdown order: stop this
+session's collector and tunnel through their command handles, confirm exit, then
+delete `LOG_FILE` and its empty auto-created directory unless the user requests
+retained evidence. Leave a user-supplied collector running unless asked to stop it.
 
 Inspect the diff and run relevant repository checks; repeat or expand them only
 for new edits, failures, or unresolved risks. Report cleanup status with the
