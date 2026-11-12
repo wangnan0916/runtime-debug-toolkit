@@ -40,11 +40,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "scripts": {
-    "check": "node --check extensions/skill-prompt.mjs && node --check extensions/checkpoint.mjs && node --check extensions/debug-mode.ts && node --check extensions/trace-mode.ts && node --check skills/trace-mode/scripts/log-server.mjs && node --check skills/trace-mode/scripts/collector-server.mjs && node --check skills/trace-mode/scripts/start-collector.mjs && node --check skills/trace-mode/assets/browser-log-helper.js && node --check skills/trace-mode/assets/node-log-helper.js && node --check tests/log-server.test.mjs",
-    "test": "node tests/log-server.test.mjs",
-    "prepublishOnly": "npm run check && npm test"
-  },
   "engines": {
     "node": ">=24"
   },

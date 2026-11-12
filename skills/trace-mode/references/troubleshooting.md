@@ -1,37 +1,26 @@
-# Server Troubleshooting
+# Collection Recovery
 
-Read only the branch matching the observed failure.
+Read the branch matching the observed failure.
 
-## Startup
+## Startup or Process Exit
 
-Confirm Node.js 24 or later is active.
-Follow the host permission path in [`collector.md`](collector.md).
-When the environment already declares that listeners require approval, use
-that path directly instead of reproducing `EPERM` in the default sandbox.
-In other environments, escalate only after a clear permission or listener error.
+Check Node.js 24+, the command's stderr, and the saved process handle. Follow
+[collector permissions](collector.md#permissions) for actual permission failures.
+For an unhealthy owned collector, stop it before replacement, update the producer
+and tunnel destinations, and confirm health and delivery before another attempt.
 
-## Collector Exited or Unhealthy
+## Rejected or Blocked Delivery
 
-Inspect the saved command handle and its stderr. Stop an unhealthy owned process
-before starting a replacement. Run the safe wrapper with the intended session;
-it starts a new process with a new contract. Update producer URLs and any tunnel,
-then confirm `HEALTH_URL` and event delivery before recording a fresh attempt.
+Check `POST /log`, JSON object shape, content type, session characters, and the
+one MiB body limit. For browsers, inspect mixed content, CSP `connect-src`, and
+preflight `OPTIONS`. Use an authorized reachable route or same-origin proxy when
+loopback is unavailable; preserve the producer path under investigation.
 
-## Rejected Event
+## Empty or Missing Events
 
-Confirm the request uses `POST /log` and a JSON object body.
-Confirm the `content-type` is `application/json`.
-Check session characters and the one MiB body limit.
-
-## Browser Delivery
-
-Inspect mixed-content rules and CSP `connect-src` after a blocked request.
-Inspect the `OPTIONS` request after a preflight failure.
-Use a same-origin proxy or server-side producer when loopback delivery is prohibited.
-
-## Empty Log
-
-After a manual gate permits analysis, confirm the producer reached its delivery
-boundary and inspect current-attempt evidence. Confirm the endpoint, session,
-and run match the active contract and event plan.
-Remember that `LOG_FILE` appears only after the first accepted event.
+Confirm the trigger reached the instrumented path and that endpoint, session,
+run, and attempt boundary match. `LOG_FILE` appears only after an accepted event.
+Separate control-flow absence from delivery loss using nearby events and transport
+checks. Account for in-flight requests before deciding evidence is missing.
+If collection checks pass but expected events do not arrive, narrow the probes
+or trigger for a fresh attempt; missing logs alone do not establish runtime cause.

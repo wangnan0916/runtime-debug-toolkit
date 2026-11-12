@@ -117,11 +117,19 @@ Other Agent Skills clients use a plain-text fallback. Active sessions continue
 across capture, reproduction, and verification replies until cleanup, explicit
 handoff, or abandonment.
 
-Both skills continue authorized work without an approval at every step. Debug
-Mode retains manual reproduction and verification by default; an explicit user
-choice of an automated method changes only that phase. Evidence is scoped to the
-current session, run, and attempt, with probes required for the observed path.
-Cleanup removes only the current session's temporary additions.
+Both skills default to agent-executed triggers and observations when authorized
+tools and a representative environment are available. Debug Mode can reproduce,
+prove, fix, and verify without manual checkpoints. Each phase independently
+requests user help only for unavailable operations or observations, or follows an
+explicit user choice. The actual method and verification coverage are reported.
+
+Both executors follow the same [attempt contract](skills/trace-mode/references/attempts.md):
+observe the original behavior against a stated criterion and require the expected
+current-session, run, and attempt probes. Command success or unrelated passing
+tests alone cannot prove a fix. Uninformative retries require a changed approach;
+missing prerequisites request specific help. An incomplete outcome identifies
+remaining verification and receives cleanup when the session ends. Pending user
+observations keep the session active. Cleanup removes only this session's additions.
 
 ## Local evidence loop
 
@@ -155,13 +163,14 @@ listener creation as approval-gated, the agent requests narrowly scoped
 approval for this wrapper as the normal startup path. Other environments start
 it directly.
 
-For projects with a UI, the agent also adds a temporary bottom-right log service
-connection indicator. The skill defines its
+The agent checks log service connectivity from the producer's runtime. When a
+user needs visible feedback during manual operation or requests it, the agent
+also adds a temporary bottom-right connection indicator. The skill defines its
 [states and lifecycle](skills/trace-mode/references/connection-status.md); the
 agent implements it with the target project's UI and request APIs, whether H5,
-a mini program, or another runtime. It checks `/health` from the producer's
-environment and updates as connectivity changes. Connected means the service
-is reachable; log delivery still requires evidence in the session file.
+a mini program, or another runtime. Producer checks use `/health` from that
+runtime; an optional indicator updates as connectivity changes. Connected means
+the service is reachable; log delivery still requires evidence in the session file.
 The indicator and its checks are removed with the temporary probes.
 
 ## Phone debugging across networks
@@ -198,7 +207,7 @@ skills/trace-mode/
   SKILL.md                         # trace and code-location workflow
   agents/openai.yaml
   assets/                          # browser and Node.js log helpers
-  references/                      # event, collector, and checkpoint contracts
+  references/                      # shared attempts, collection, cleanup, manual transport
   scripts/                         # collector startup, sink, and lifecycle
     log-server.mjs                 # foreground CLI
     collector-server.mjs           # NDJSON HTTP sink (library)
@@ -207,10 +216,7 @@ skills/trace-mode/
 skills/debug-mode/
   SKILL.md                         # hypothesis, fix, verify, and cleanup workflow
   agents/openai.yaml
-  references/                      # debug probes and checkpoints
-
-tests/
-  log-server.test.mjs              # collector behavior and concurrency
+  references/                      # debug evidence decisions, probes, manual checkpoints
 ```
 
 ## Safety and privacy
@@ -230,8 +236,6 @@ with the same system permissions as Pi.
 Runtime scripts require Node.js 24 or later and use only Node.js built-ins.
 
 ```bash
-npm run check
-npm test
 npx tsc --noEmit                  # type-check extensions against the pi ExtensionAPI
 npm pack --dry-run
 ```
@@ -240,10 +244,22 @@ Extension type imports resolve through `@earendil-works/pi-coding-agent`, which
 is listed in both `peerDependencies` (runtime, provided by Pi) and
 `devDependencies` (local editor/type checking only; never packed).
 
-Skill guidance follows the [OpenAI prompting recommendations](https://developers.openai.com/api/docs/guides/latest-model#prompting-best-practices):
-keep shared rules in one place, respect user scope, make stopping conditions
-explicit, and match verification effort to the change. Model and API settings
-remain the host's responsibility.
+Skill guidance follows the [OpenAI GPT-6 Astra prompting recommendations](https://developers.openai.com/api/docs/guides/latest-model#prompting-best-practices),
+reviewed on 2026-11-12. The entry points state outcomes and decision rules;
+references carry collector mechanics, evidence requirements, and optional manual
+interaction. User scope and existing authorization take precedence over defaults,
+and verification effort is proportional to the change.
+
+Both workflows share the [attempt contract](skills/trace-mode/references/attempts.md)
+and [session cleanup](skills/trace-mode/references/cleanup.md). Debug Mode composes
+Trace Mode's instrumentation without requiring another agent. Cards and hypotheses
+are compact working context rather than mandatory user-facing forms. Model,
+reasoning, and delegation settings remain the host's responsibility.
+
+For review, walk through an agent-executed CLI/API reproduction and verification,
+a browser-triggered trace, and a device-only user observation. Also check missing
+probes, failed verification, pending/cancelled replies, and interrupted-session
+recovery: these must preserve evidence scope and avoid a false completion claim.
 
 ## Support
 

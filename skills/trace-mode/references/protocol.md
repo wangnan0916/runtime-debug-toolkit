@@ -1,42 +1,27 @@
 # Event Protocol
 
-Read this reference before connecting a producer.
-
-## Request
-
-Send one JSON object per request:
+Read before connecting a producer. Send one JSON object to:
 
 ```text
 POST <LOG_SERVER_URL>/log
 Content-Type: application/json
 ```
 
-The server adds an ISO timestamp in `ts`.
-It uses the request's `session` when present.
-Otherwise it uses the server's default session.
+The collector adds an ISO timestamp in `ts` and uses the request's `session`, or
+its default session when omitted. Session IDs accept letters, digits, dots,
+underscores, and hyphens. Arrays, non-object JSON, and bodies over one MiB are
+rejected. `OPTIONS` supports browser preflight; `GET /health` reports status.
 
-Session IDs accept letters, digits, dots, underscores, and hyphens.
-Request bodies larger than one MiB are rejected.
-Arrays and non-object JSON values are rejected.
-
-## Response
-
-A successful response has HTTP status `200` and this shape:
+A successful append completes before HTTP `200` with:
 
 ```json
-{
-  "ok": true,
-  "session": "example-session",
-  "logFile": "/temporary/path/example-session.ndjson"
-}
+{ "ok": true, "session": "example-session", "logFile": "/tmp/example-session.ndjson" }
 ```
 
-The append completes before success is returned.
-Failed appends return a non-success status and an `error` field.
+Failed appends return a non-success status with an `error` field.
 
-## Producer Safety
-
-Build events from an explicit allowlist of consumer-required fields.
-Exclude secrets, tokens, cookies, authorization headers, and unrelated personal data.
-Treat delivery as best-effort when the producer must continue without the server.
-Avoid high-volume events unless the request requires them.
+Build payloads from an explicit allowlist of trace-relevant fields. Exclude
+secrets, credentials, cookies, authorization headers, raw private requests or
+responses, and unrelated personal data. Redact identifiers when identity matters.
+Treat producer delivery as best-effort so logging failure leaves product behavior
+unchanged; verify expected records in the local evidence file.

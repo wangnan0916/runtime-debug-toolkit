@@ -11,21 +11,28 @@ const DEBUG_CHECKPOINT_SPEC: CheckpointSpec = {
 	toolName: TOOL_NAME,
 	label: "Debug Mode",
 	description:
-		"Show one Debug Mode checkpoint. An active session survives replies and retries until cleanup or explicit abandonment.",
-	promptSnippet: "Show an interactive Debug Mode checkpoint with A, B, and C",
+		"Collect one manual Debug Mode observation. Returns a phase-specific result; cancellation or unavailable UI leaves the session pending.",
+	promptSnippet: "Collect a required manual Debug Mode observation",
 	promptGuidelines: [
-		"Use the bundled debug-mode checkpoint reference to choose the supported interaction path; native tools take precedence only when permitted in the current mode.",
-		"On the Pi path, call debug_mode_checkpoint for the current manual attempt after preparing its context, then wait for a submitted result before dependent work.",
-		"A cancelled or UI-unavailable result requests the plain-text fallback while the attempt stays pending. Preserve the active session across replies.",
+		"Use only for required user participation or an explicit manual choice; agent-executed attempts do not need this tool.",
+		"Follow the bundled debug-mode checkpoint reference for transport selection, current-attempt results, and pending/cancelled handling.",
 	],
 	phases: [
-		{ id: "pre-fix", action: "reproduce the bug" },
+		{
+			id: "pre-fix",
+			action: "reproduce the bug",
+			choices: [
+				{ code: "A", label: "A - Reproduced", meaning: "Reproduced", result: "reproduced" },
+				{ code: "B", label: "B - Issue did not recur", meaning: "Issue did not recur", result: "not_reproduced" },
+				{ code: "C", label: "C - Other: enter details", meaning: "Other", result: "inconclusive" },
+			],
+		},
 		{ id: "post-fix", action: "verify the original bug" },
 	],
 	choices: [
-		{ code: "A", label: "A - Reproduced", meaning: "Reproduced" },
-		{ code: "B", label: "B - Fixed", meaning: "Fixed" },
-		{ code: "C", label: "C - Other: enter details", meaning: "Other" },
+		{ code: "A", label: "A - Still reproducible", meaning: "Still reproducible", result: "failed" },
+		{ code: "B", label: "B - Fixed", meaning: "Fixed", result: "passed" },
+		{ code: "C", label: "C - Other: enter details", meaning: "Other", result: "inconclusive" },
 	],
 	otherCode: "C",
 	endpointLabel: "Debug endpoint",

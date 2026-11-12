@@ -1,12 +1,16 @@
-# Temporary Log Design
+# Temporary Probes
 
-Read this reference before adding temporary instrumentation.
+Read before instrumentation. Follow [protocol](protocol.md) for delivery and
+payload privacy. Select low-volume events that distinguish the disputed paths,
+state transitions, or values, rather than logging every call.
 
-## Event Shape
+## Event Plan
 
-Use stable probe names around the traced boundary. Record a `runId` in the event
-plan and include it in every event; standalone traces can use `trace-1`, while
-Debug Mode supplies its phase value. The helpers add the session, not the run ID.
+Use stable probe names and include a `runId` in each event. Standalone traces
+can use `trace-1`; Debug Mode supplies `pre-fix` or `post-fix`. The helpers add
+the session, not the run. Record expected events for each path; mutually
+exclusive branches need not all emit. Add correlation or sequence fields when
+concurrent operations would otherwise be ambiguous.
 
 ```json
 {
@@ -15,31 +19,19 @@ Debug Mode supplies its phase value. The helpers add the session, not the run ID
   "probe": "settings.beforePersist",
   "file": "src/settings/save.ts",
   "fn": "saveSettings",
-  "vars": {
-    "enabled": true,
-    "userId": "redacted"
-  }
+  "vars": { "enabled": true }
 }
 ```
 
-Record state transitions instead of every high-frequency call.
-Sampling is acceptable when causal ordering remains visible.
-Send events to `<LOG_SERVER_URL>/log` instead of product output streams.
+## Helpers and Removal Markers
 
-## Privacy Allowlist
+Copy the [browser helper](../assets/browser-log-helper.js) or
+[Node.js helper](../assets/node-log-helper.js), replacing `<session_id>` and
+`<LOG_SERVER_URL>`. Their local function is `logServerLog`. For another runtime,
+use a small equivalent client; delivery failure must not change product behavior
+or pollute product stdout.
 
-Build `vars` from explicit, trace-relevant fields.
-Use redacted identifiers when identity is necessary.
-
-Exclude these values:
-
-- Secrets, tokens, cookies, authorization headers, and API keys
-- Raw requests or responses containing private data
-- Personal data unrelated to the runtime question
-
-## Mechanical Regions
-
-Wrap every temporary helper and event with the session marker:
+Wrap every temporary helper, event, and integration edit with paired markers:
 
 ```ts
 // #region LOG_SERVER_PROBE <session_id> settings-before-persist
@@ -48,28 +40,12 @@ logServerLog({
   probe: "settings.beforePersist",
   file: "src/settings/save.ts",
   fn: "saveSettings",
-  vars: { enabled, userId: "redacted" },
+  vars: { enabled },
 });
 // #endregion LOG_SERVER_PROBE <session_id>
 ```
 
-Use the file's native comment syntax outside JavaScript.
-Preserve `LOG_SERVER_PROBE <session_id>` in both markers.
-
-## Runtime Helpers
-
-Copy [`../assets/browser-log-helper.js`](../assets/browser-log-helper.js) for browser or frontend JavaScript.
-Copy [`../assets/node-log-helper.js`](../assets/node-log-helper.js) for Node.js or server JavaScript.
-Replace `<session_id>` and `<LOG_SERVER_URL>`.
-Keep the helper name `logServerLog`.
-
-For another runtime, write the smallest local client beside the traced boundary.
-Follow [`protocol.md`](protocol.md).
-Delivery failures must leave product behavior unchanged.
-
-## Connection Status
-
-Follow [`connection-status.md`](connection-status.md) when adding the temporary
-connection indicator. Implement it with the target project's UI and request
-APIs; the bundled log helpers do not mount UI or track health. Keep its checks
-separate from business probes so they do not add records to the trace.
+Use native comment syntax outside JavaScript, preserving the session text in
+both markers. Check replacements, payloads, and
+[producer connectivity](connection-status.md) before capture. The bundled helpers
+do not implement health checks or connection UI.

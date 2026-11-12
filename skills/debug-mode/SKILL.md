@@ -1,77 +1,57 @@
 ---
 name: debug-mode
-description: Diagnose and fix runtime bugs using temporary structured logs and verified evidence. Use when the user invokes debug-mode or requests instrumented debugging, and resume active sessions after reproduction or verification replies. Use trace-mode for code location without a fix.
+description: Diagnose and fix runtime bugs with temporary structured logs when static inspection cannot establish the cause. Use for debug-mode or instrumented debugging requests, and resume active investigations after follow-ups. Use trace-mode for code location without a product fix.
 ---
 
 # Debug Mode
 
-Prove a runtime cause, fix it, verify the original behavior, and clean up.
-Start for `$debug-mode`, `/debug-mode`, `debug mode`, or an instrumented debugging
-request; resume an active session after replies or compaction. An unrelated task
-or a checkpoint answer without an active session does not start instrumentation.
-The sibling [`trace-mode`](../trace-mode/SKILL.md) supplies the collector and
-instrumentation workflow and requires Node.js 24 or later.
+Deliver an evidence-backed cause, a scoped fix, verification of the original
+behavior, and removal of temporary instrumentation. The sibling
+[Trace Mode](../trace-mode/SKILL.md) provides collection; its scripts need Node.js 24+.
 
-## Working Contract
+## Execution
 
-Within host permissions, explicit user scope and workflow choices override skill
-defaults. Continue authorized work without step-by-step approval. Resolve routine
-unknowns from available evidence; ask only for missing input that changes the
-next decision. Keep one compact Bug Card and Hypothesis Matrix in session context,
-updating them instead of repeating the plan. Read references as their stage applies.
+User instructions and existing authorization take precedence over skill defaults
+within host permissions. Carry the requested investigation through completion;
+resolve routine choices from the code and tools. Reproduce and verify directly
+when capable. Ask for a specific missing input, operation, or observation only
+when it prevents the next useful action. Honor a user's choice to operate manually.
 
-Manual reproduction and verification are the default observations for this workflow.
-Wait for the user's current-attempt result before advancing either manual gate.
-Tests or arriving logs cannot supply that result. An explicitly user-selected
-automated method changes only the named phase; report which method actually ran.
+Resume an active session on follow-ups or compaction. Keep a compact Bug Card
+and Hypothesis Matrix as working context, without requiring a user-facing form.
+Read references when their stage applies.
 
-## 1. Analyze and Hypothesize
+## Investigate
 
-Read the entry points, handlers, state transitions, logs, and changes relevant to
-the symptom. Keep a Bug Card: symptom versus expected behavior; trigger and
-input; candidate path and disputed boundaries; environment and available
-evidence; observable acceptance criterion. Mark unavailable facts `unknown`.
+Establish the symptom, expected behavior, trigger, relevant environment, and an
+observable acceptance criterion. Inspect enough code to identify the disputed
+runtime boundary. Rank plausible causes with a prediction and a probe that can
+confirm or reject each; mark unknowns and inconclusive evidence explicitly.
 
-Rank hypotheses supported by that evidence. Each needs:
+Use Trace Mode in **caller mode**, supplying that context. Read the
+[debug event extension](references/probes.md) when instrumenting. Keep the probes
+and collector active through correction and verification.
 
-```text
-H1 <cause>
-Prediction: <runtime state, path, or timing>
-Probe: <events and code locations>
-CONFIRMED when: <record condition>
-REJECTED when: <record condition>
-```
+## Reproduce, Fix, and Verify
 
-Use enough hypotheses and probes to distinguish the cause, without a fixed quota.
-Prefer events that separate multiple explanations. Batch independent reads;
-keep session edits, checkpoints, and cleanup under one owner.
+Follow the shared [attempt contract](../trace-mode/references/attempts.md) before
+triggering the instrumented path. Use [prove, fix, and verify](references/prove-fix-verify.md)
+to evaluate the observations and continue through the correction. Agent-executed
+and user-executed attempts require the same runtime evidence.
 
-## 2. Instrument Through Trace Mode
+Read [manual checkpoints](references/checkpoints.md) only when user participation
+is needed. While a required user observation is `pending_user`, retain the
+session and wait before dependent analysis, edits, or completion. Continue
+independent work that does not depend on that observation.
 
-Read [`trace-mode`](../trace-mode/SKILL.md) and use its caller mode with the Bug
-Card and Hypothesis Matrix. Read [`references/probes.md`](references/probes.md)
-for the debug event extension. Return before standalone capture with active
-probes, the Collector Contract, producer connection status, and any tunnel handle.
-Keep probes and connection checks active through the fix and verification.
+If attempts stop producing information, change the approach or identify the
+missing prerequisite. Use [troubleshooting](references/troubleshooting.md) for
+reproduction or collection failures; report incomplete verification honestly.
 
-## 3. Reproduce, Prove, Fix, and Verify
+## Finish
 
-Use [`references/checkpoints.md`](references/checkpoints.md) for the attempt
-boundary, supported interaction path, result validation, and phase mappings.
-
-- `PENDING`: keep the session active and wait.
-- Pre-fix `B` or `C`: follow the result table, adjust the attempt, and checkpoint again.
-- Pre-fix `A`: follow [`references/prove-fix-verify.md`](references/prove-fix-verify.md)
-  through evidence, correction, verification, and cleanup. No additional approval
-  is needed to fix the confirmed cause within the requested scope.
-
-## Completion and Exceptions
-
-Report the cause with current-attempt evidence and file locations, what changed,
-verification performed, cleanup status, and remaining uncertainty. Use the user's
-language and detail proportional to the diagnosis.
-
-The session ends after cleanup or explicit abandonment. For abandonment, follow
-[`references/cleanup.md`](references/cleanup.md) without claiming a verified fix.
-Read [`references/troubleshooting.md`](references/troubleshooting.md) only when
-collection, reproduction, or delivery fails.
+Follow the shared [cleanup procedure](../trace-mode/references/cleanup.md) when
+finishing or abandoning the session. Report the cause and supporting probe
+values/locations, the correction, actual verification and its limits, and cleanup
+status. Use concise language matching the user; include detail needed to assess
+the result rather than a transcript of the investigation.

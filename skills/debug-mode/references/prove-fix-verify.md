@@ -1,57 +1,50 @@
 # Prove, Fix, and Verify
 
-Read after the current attempt establishes pre-fix `A`, or re-enter after a
-post-fix `A` reports failed verification, under
-[`checkpoints.md`](checkpoints.md).
-The checkpoint's `ATTEMPT_START_LINE` defines the evidence boundary.
+Use after an instrumented reproduction or failed verification. The shared
+[attempt contract](../../trace-mode/references/attempts.md) defines evidence scope
+and execution; this reference defines Debug Mode's decisions.
 
-```text
-prove -> fix -> verification gate
-```
+## Establish the Cause
 
-## 1. Prove the Cause
+For `reproduced`, compare current-attempt probe values against the hypothesis
+predictions. Classify live explanations as confirmed, rejected, or inconclusive
+with probe names, log locations, and relevant values. Proceed to a correction
+when evidence explains the observed failure and its acceptance criterion.
 
-Read only complete records appended to `LOG_FILE` after `ATTEMPT_START_LINE`.
-Filter to the active session and the attempt's run (`pre-fix` for reproduction,
-`post-fix` for failed verification). Require the probes expected for the observed
-path, including control-flow and delivery evidence before
-interpreting an absent branch event. Compare values against hypothesis predictions;
-append order alone does not establish causality across concurrent producers.
+For `not_reproduced`, inspect trigger/environment differences and possible probe
+effects; disappearance alone proves neither a cause nor a fix. For inconclusive
+observations or missing expected evidence, narrow the event plan or resolve
+collection before another attempt. Read [troubleshooting](troubleshooting.md)
+for the observed failure rather than loading every recovery branch.
 
-Classify each hypothesis as `CONFIRMED`, `REJECTED`, or `INCONCLUSIVE`, with
-specific probe names, log line references, and relevant values. State the
-observable acceptance criterion and the smallest correction supported by that
-evidence. Keep unproven explanations separate from findings.
+A failed post-fix attempt can establish the remaining cause directly. Otherwise
+use the current code as a new baseline with `runId: "pre-fix"` and update the
+hypotheses. There is no need for a user to repeat an already established observation.
 
-Missing expected probes, or only rejected/inconclusive hypotheses, require an
-adjusted event plan and fresh reproduction checkpoint. Treat the current code
-as that attempt's baseline and label its events `pre-fix`. If failed-verification
-records already confirm the remaining cause, proceed to its correction without
-asking the user to repeat the same observation.
+## Correct and Verify
 
-**Complete when:** current-attempt records confirm one explanatory cause, with one observable acceptance criterion.
+Make the smallest correction supported by the confirmed cause. Keep relevant
+probes active, with stable names and `runId: "post-fix"`, so verification can
+compare the same behavior. Adjust probes if the corrected path requires it.
 
-## 2. Make the Evidence-Bound Fix
+Run checks relevant to the changed behavior and repository-required checks. Add
+a regression test when it demonstrates the original failure and guards the
+correction; reuse adequate existing coverage. Avoid tests that merely mirror
+implementation. Once checks pass, broaden or repeat only for changed code,
+failures, or unresolved risk.
 
-Make the smallest change that addresses the confirmed cause.
-Keep every probe active.
-Change events to `runId: "post-fix"`.
-Run existing checks relevant to the changed behavior and repository-required
-checks. Add a focused regression test when it can demonstrate the bug and guard
-the correction; reuse existing coverage when sufficient. Avoid tests that only
-mirror implementation. Broaden testing only for an uncovered risk or failure.
-Automated checks support the diagnosis; they do not replace a manual gate unless
-the user explicitly changed the verification method.
+Verify the original trigger against the acceptance criterion with a fresh
+post-fix attempt boundary. A focused check may perform this verification when
+it supplies both the behavioral assertion and expected runtime probes; prepare
+its boundary first and evaluate that attempt without rerunning it unnecessarily.
 
-**Complete when:** each product edit traces to the confirmed cause, and post-fix evidence is ready.
+| Result | Next action |
+| --- | --- |
+| `passed` with expected evidence | Follow shared [cleanup](../../trace-mode/references/cleanup.md). |
+| `failed` | Use post-fix evidence to narrow the remaining cause and correct it. |
+| `inconclusive` or evidence gaps | Resolve the gap or adjust the next attempt; do not claim verification. |
+| `pending_user` | Retain the session and wait for the required observation. |
 
-## 3. Cross the Verification Gate
-
-Prepare and present one post-fix checkpoint through
-[`checkpoints.md`](checkpoints.md).
-
-- `PENDING`: yield with the session and probes active.
-- Post-fix `A` or `C`: route the result through the state table, inspect only the current-attempt records when applicable, and return to the hypothesis or probe plan.
-- Post-fix `B`: confirm the expected probes for the observed path with the active session and `runId: "post-fix"` after `ATTEMPT_START_LINE`, then read [`cleanup.md`](cleanup.md). Missing required evidence returns to a fresh verification attempt.
-
-**Complete when:** a valid post-fix `B` plus every expected current-attempt probe unlocks cleanup, or the current `A`/`C` result has been routed without advancing it.
+Use [manual checkpoints](checkpoints.md) only for required user participation.
+If ending without complete verification, explain what was established, what
+changed, and which criterion or environment remains unverified, then clean up.

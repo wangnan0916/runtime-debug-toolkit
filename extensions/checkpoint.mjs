@@ -11,8 +11,8 @@
  * the semantics live with the workflow author.
  */
 
-/** @typedef {{code: string, label: string, meaning: string}} CheckpointChoice */
-/** @typedef {{id: string, action: string}} CheckpointPhase */
+/** @typedef {{code: string, label: string, meaning: string, result: string}} CheckpointChoice */
+/** @typedef {{id: string, action: string, choices?: CheckpointChoice[]}} CheckpointPhase */
 /**
  * @typedef {object} CheckpointSpec
  * @property {string} workflowName        Human name, e.g. "Debug Mode".
@@ -21,7 +21,7 @@
  * @property {string} description         Tool description for the model.
  * @property {string} promptSnippet       Tool promptSnippet.
  * @property {string[]} promptGuidelines  Tool promptGuidelines.
- * @property {CheckpointPhase[]} spec.phases  One entry = no phase param; more = required enum param.
+ * @property {CheckpointPhase[]} phases  One entry = no phase param; more = required enum param.
  * @property {CheckpointChoice[]} choices Select options in display order.
  * @property {string} otherCode           Which choice code opens the free-form editor.
  * @property {string} endpointLabel       Field label above the endpoint value, e.g. "Debug endpoint".
@@ -54,27 +54,24 @@ function buildParameters(spec) {
 
 /** @param {CheckpointSpec} spec @param {Record<string, string>} params */
 function unavailableResult(spec, params, reason) {
+	const state = {
+		result: "pending_user",
+		executor: "user",
+		cancelled: true,
+		reason,
+		sessionActive: true,
+	};
 	return {
-		content: [
-			{
-				type: "text",
-				text: JSON.stringify(
-					{
-						cancelled: true,
-						reason,
-						sessionActive: true,
-						instruction: `Show the plain-text ${spec.workflowName.toLowerCase()} checkpoint for this attempt. Keep the session active for later interactive checkpoints.`,
-					},
-					null,
-					2,
-				),
-			},
-		],
+		content: [{
+			type: "text",
+			text: JSON.stringify({
+				...state,
+				instruction: `Show the plain-text ${spec.workflowName.toLowerCase()} checkpoint for this attempt. Keep the session active for later interactive checkpoints.`,
+			}, null, 2),
+		}],
 		details: {
 			...params,
-			cancelled: true,
-			reason,
-			sessionActive: true,
+			...state,
 			...(spec.extraDetails ? spec.extraDetails(params) : {}),
 		},
 	};
@@ -82,7 +79,7 @@ function unavailableResult(spec, params, reason) {
 
 /** @param {CheckpointSpec} spec @param {Record<string, string>} params */
 function answeredResult(spec, params, choice, text) {
-	const answer = { selection: choice.code, meaning: choice.meaning };
+	const answer = { selection: choice.code, meaning: choice.meaning, result: choice.result, executor: "user" };
 	if (choice.code === spec.otherCode) answer.text = text;
 
 	return {
@@ -105,6 +102,8 @@ function answeredResult(spec, params, choice, text) {
 			cancelled: false,
 			selection: choice.code,
 			meaning: choice.meaning,
+			result: choice.result,
+			executor: "user",
 			sessionActive: true,
 			...(choice.code === spec.otherCode && text ? { text } : {}),
 			...(spec.extraDetails ? spec.extraDetails(params) : {}),
@@ -132,9 +131,10 @@ export function registerCheckpointTool(pi, spec) {
 
 			const phase =
 				spec.phases.find((candidate) => candidate.id === params.phase) ?? spec.phases[0];
+			const choices = phase.choices ?? spec.choices;
 			const title = [
 				spec.workflowName,
-				`Please ${phase.action} manually, then choose the result.`,
+				`Complete the requested manual operation or observation to ${phase.action}, then choose the result.`,
 				`Session: ${params.session}`,
 				`Log file: ${params.logFile}`,
 				`${spec.endpointLabel}: ${params.debugEndpoint}`,
@@ -143,11 +143,11 @@ export function registerCheckpointTool(pi, spec) {
 			while (true) {
 				const selected = await ctx.ui.select(
 					title,
-					spec.choices.map((choice) => choice.label),
+					choices.map((choice) => choice.label),
 				);
 				if (!selected) return unavailableResult(spec, params, "cancelled");
 
-				const choice = spec.choices.find((candidate) => candidate.label === selected);
+				const choice = choices.find((candidate) => candidate.label === selected);
 				if (!choice) return unavailableResult(spec, params, "cancelled");
 				if (choice.code !== spec.otherCode) return answeredResult(spec, params, choice);
 

@@ -1,15 +1,12 @@
 # Debug Probe Extension
 
-Read the sibling [`trace-mode` probe guide](../../trace-mode/references/probes.md) first.
-Use its helpers, privacy allowlist, delivery contract, and `LOG_SERVER_PROBE` markers.
+Extend the shared [probe design](../../trace-mode/references/probes.md) with
+events that distinguish live hypotheses. Prefer an event that separates several
+explanations; avoid a fixed probe quota or duplicating events for each hypothesis.
 
-## Discriminating Events
-
-Place events at boundaries between live hypotheses.
-Prefer one event that confirms one hypothesis while rejecting another.
-Keep probe names stable across pre-fix and post-fix runs.
-
-Extend the generic event with `hypothesis` and the current `runId`:
+Use `runId: "pre-fix"` for reproduction and `runId: "post-fix"` for verification.
+Keep probe names stable across the correction. A `hypothesis` field can associate
+an event with the Hypothesis Matrix when useful:
 
 ```json
 {
@@ -19,29 +16,10 @@ Extend the generic event with `hypothesis` and the current `runId`:
   "hypothesis": "H1",
   "file": "src/settings/save.ts",
   "fn": "saveSettings",
-  "vars": {
-    "enabled": true,
-    "userId": "redacted"
-  }
+  "vars": { "enabled": true }
 }
 ```
 
-Use `runId: "pre-fix"` before the fix.
-Use `runId: "post-fix"` after the fix.
-
-## Example Region
-
-```ts
-// #region LOG_SERVER_PROBE <session_id> settings-before-persist
-logServerLog({
-  runId: "pre-fix",
-  probe: "settings.beforePersist",
-  hypothesis: "H1",
-  file: "src/settings/save.ts",
-  fn: "saveSettings",
-  vars: { enabled, userId: "redacted" },
-});
-// #endregion LOG_SERVER_PROBE <session_id>
-```
-
-**Complete when:** every live hypothesis has a privacy-reviewed event with falsifiable record conditions.
+The event plan should say which observed values confirm or reject a cause and
+which probes are expected on that path. Shared privacy, delivery, and removal
+rules apply unchanged.

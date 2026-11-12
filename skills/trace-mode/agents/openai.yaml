@@ -1,6 +1,6 @@
 interface:
   display_name: "Trace Mode"
   short_description: "Locate runtime code paths with temporary logs"
-  default_prompt: "Use $trace-mode to trace this runtime behavior with temporary logs and locate the responsible code path."
+  default_prompt: "Use $trace-mode to locate the code responsible for this runtime behavior with temporary logs, then clean up."
 policy:
   allow_implicit_invocation: true

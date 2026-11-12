@@ -1,6 +1,6 @@
 interface:
   display_name: "Debug Mode"
   short_description: "Prove and fix runtime bugs with temporary logs"
-  default_prompt: "Use $debug-mode to diagnose this reproducible runtime bug, fix the confirmed cause, verify it, and clean up."
+  default_prompt: "Use $debug-mode to investigate this runtime bug, fix its confirmed cause, verify the original behavior, and clean up."
 policy:
   allow_implicit_invocation: true

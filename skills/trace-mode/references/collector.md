@@ -1,22 +1,18 @@
-# Server Lifecycle
+# Collector Lifecycle
 
-Read this reference before starting the session’s server.
+Read before startup. Use Node.js 24+ and keep the host's long-running command
+handle so the session can continue and the process can be stopped later.
 
-## Safe Start
-
-Run the wrapper as a long-running command with one session ID:
+## Start and Retain the Contract
 
 ```bash
 node <trace-mode-skill-dir>/scripts/start-collector.mjs --session <session_id>
 ```
 
-The wrapper fixes the host to `127.0.0.1` and the port to `0`.
-Each invocation starts its own foreground collector and unique temporary log
-directory; it does not discover or reuse a global service. Keep the host's
-command/session handle so the agent can stop this process later. Do not run it
-as a detached fire-and-forget process or wait for it to exit before continuing.
-Capture the printed Collector Contract — the five values plus their
-machine-readable form on the final `COLLECTOR_CONTRACT=` line:
+The wrapper starts one foreground collector on `127.0.0.1` with an available
+port and a unique temporary log directory. Keep it running while continuing the
+investigation. There is no detached service, global discovery, or shared lifecycle.
+Capture its printed contract, preferably the final JSON object verbatim:
 
 ```text
 LOG_SERVER_URL=<loopback origin>
@@ -27,100 +23,53 @@ HEALTH_URL=<loopback health URL>
 COLLECTOR_CONTRACT={"logServerUrl":"…","sessionId":"…","logDir":"…","logFile":"…","healthUrl":"…"}
 ```
 
-Prefer copying the `COLLECTOR_CONTRACT` JSON object verbatim.
-The five `KEY=VALUE` lines remain the human-readable form of the same contract.
+A complete healthy user-supplied contract can replace startup. Leave that
+collector's lifecycle to the user unless shutdown is requested.
+`LOG_FILE` appears on the first accepted event. Each session has a separate file
+and write queue. See [protocol](protocol.md) for requests and append guarantees.
 
-A complete user-supplied set can replace the command.
-Confirm `HEALTH_URL` before reusing that set.
+## Permissions
 
-## Cross-Network Devices
+Follow the host's declared permission mechanism. If listener creation explicitly
+requires approval, use it for the wrapper at startup; otherwise start normally.
+A clear permission error may justify that host's approval path. A service
+disconnect alone does not.
 
-When a phone or remote producer cannot reach loopback, start the collector normally
-and retain its printed local contract. Then:
+Scope approval to the exact wrapper command. Offer a reusable rule only for a
+read-only installation and include the absolute wrapper path; a writable skill
+or repository does not qualify. Explain that the wrapper binds loopback, writes
+temporary logs, and makes no external requests. A public tunnel has different
+exposure. Honor a denial without retrying through another mechanism; continue
+independent analysis or use a user-managed collector if the host permits it and
+the user chooses it.
 
-1. Check `cloudflared --version` on the development machine. If missing, the agent
-   follows the [official installation instructions](https://developers.cloudflare.com/tunnel/downloads/)
-   for that environment and checks the command again.
-2. Keep a foreground [Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
-   running against the collector's printed loopback origin:
+## Remote Producers
 
-   ```bash
-   cloudflared tunnel --url <local LOG_SERVER_URL>
-   ```
+When a device cannot reach loopback, use an authorized reachable route. For a
+Cloudflare Quick Tunnel, check `cloudflared --version`; if setup is needed,
+follow the [official installation instructions](https://developers.cloudflare.com/tunnel/downloads/)
+within the available permissions. Keep this command's handle:
 
-3. Read the generated `https://<random>.trycloudflare.com` origin. Use it as the
-   producer's `LOG_SERVER_URL` and set `HEALTH_URL` to that origin plus `/health`.
-   Keep `SESSION_ID`, `LOG_DIR`, `LOG_FILE`, the `/log` path, and event payloads the
-   same. Keep the original loopback contract and collector command handle.
+```bash
+cloudflared tunnel --url <local LOG_SERVER_URL>
+```
 
-Check public `/health` and one allowlisted event in `LOG_FILE` before capture;
-record the attempt boundary after this transport check. Keep the tunnel active
-through pending capture/verification, pass its command handle on handoff, and
-stop only the cloudflared process started for this session when finished.
-Anyone with the temporary URL can reach the forwarded collector while it runs.
+Use the generated HTTPS origin as the effective producer destination, with
+`/log` and `/health`. Preserve the original local Collector Contract separately;
+the session ID and local evidence file do not change. Anyone with the tunnel URL
+can reach the collector while it runs, so keep payloads allowlisted.
 
-Quick Tunnels need no Cloudflare login. The **200-request limit is concurrent
-unfinished requests per tunnel**, not a total log quota or requests-per-second
-limit; excess requests return **429**. Frequent logging and slow requests can hit
-it. Current helpers send one event per request without batching or retries, so
-check for delivery loss before interpreting missing probes as runtime evidence.
+Confirm producer health and one transport-check event in `LOG_FILE` before
+recording the first attempt boundary. The bundled helpers send individual events
+without retries; delivery failure can explain missing probes. Consult the
+[Quick Tunnel documentation](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
+for service limits rather than treating it as guaranteed delivery.
 
-## Runtime Contract
+## Ownership and Recovery
 
-- `GET /health` reports server status.
-- `POST /log` accepts one JSON object and appends one NDJSON line.
-- `OPTIONS` supports browser preflight.
-- A successful append returns HTTP `200`.
-- Each session has a separate file and write queue.
-- The default log directory is in the operating-system temporary directory.
-- `LOG_FILE` appears after the first accepted event.
-- Concurrent debugging sessions start independent collectors.
-
-The collector writes logs outside the repository and makes no external network
-calls. There is no discovery state file, startup lock, or detached child.
-
-## Ownership and Shutdown
-
-Keep the collector command handle alongside the Collector Contract. Retain both
-across replies, compaction, and handoffs; in caller mode, pass them to Debug Mode.
-Keep the collector running through pending capture, retries, and verification.
-When the session completes or is explicitly abandoned, stop the process through
-its command handle (SIGTERM or Ctrl-C) and confirm it exited. Stop any tunnel
-started for the session as well. Stop producers and pending requests first, then
-the collector, then remove session logs unless retained evidence was requested.
-Remove an empty auto-created log directory after deleting the logs.
-
-If the user supplied the collector, leave its lifecycle to them unless they
-request shutdown. If an owned collector dies, start a new one and update the
-producer and any tunnel with its new contract before recording another attempt.
-
-## Host Permission Path
-
-Choose the permission path before starting the wrapper:
-
-- When the execution environment explicitly says spawned commands need approval
-  to create a network listener, run the safe wrapper once through that approval
-  mechanism. This is the normal startup path, not a failed-start recovery.
-- Otherwise run the safe wrapper normally. Retry through the host approval
-  mechanism only after a clear permission, listener, or process error.
-
-In Codex, submit the approval call directly with the exact wrapper command and
-put the reason in that call rather than a separate user message. Scope any
-reusable command rule to `node` plus the absolute `start-collector.mjs` path,
-and offer it only when that script and its imported sibling scripts are in a
-read-only installation directory. Omit a reusable rule for a writable skill
-or repository path. Never request a reusable rule for `node` alone.
-
-For an actual approval request, explain the wrapper's loopback bind and temporary
-log writes; it neither modifies the repository nor calls external services.
-These statements describe the wrapper, not an optional public tunnel.
-
-If approval is denied, stop the blocked startup action and report the actual
-denial and its source; follow the host's approval rules instead of retrying the
-same action through another route. Continue independent code analysis if useful.
-When the host permits a user-managed collector and the user chooses that path,
-provide the wrapper command and obtain all five contract values before connecting
-the producer.
-
-A service disconnect is not an approval denial. Check health and the reported
-failure before choosing the relevant troubleshooting or permission path.
+Retain collector/tunnel handles across replies, compaction, and caller handoff.
+Keep owned processes active through pending observations, retries, and verification.
+If a collector dies, inspect its failure, replace it, update producer/tunnel
+URLs, and validate delivery before a fresh attempt. See
+[troubleshooting](troubleshooting.md) for failures and [cleanup](cleanup.md) for
+shutdown and evidence deletion.

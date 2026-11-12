@@ -4,11 +4,13 @@ export interface CheckpointChoice {
 	code: string;
 	label: string;
 	meaning: string;
+	result: string;
 }
 
 export interface CheckpointPhase {
 	id: string;
 	action: string;
+	choices?: CheckpointChoice[];
 }
 
 export interface CheckpointSpec {
